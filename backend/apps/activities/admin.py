@@ -1,0 +1,16 @@
+from django.contrib import admin
+
+from apps.activities.models import Activity, FollowUp
+
+
+@admin.register(Activity)
+class ActivityAdmin(admin.ModelAdmin):
+    list_display = ("lead", "user", "activity_type", "title", "occurred_at", "created_at")
+    list_filter = ("activity_type",)
+    search_fields = ("title", "notes", "lead__customer__name")
+
+
+@admin.register(FollowUp)
+class FollowUpAdmin(admin.ModelAdmin):
+    list_display = ("lead", "assigned_to", "reminder_type", "scheduled_at", "status")
+    list_filter = ("status", "reminder_type")

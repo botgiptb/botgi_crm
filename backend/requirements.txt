@@ -4,4 +4,4 @@ djangorestframework-simplejwt>=5.3.0
 django-cors-headers>=4.3.0
 psycopg[binary]>=3.1.0
 python-dotenv>=1.0.0
-phonenumbers>=8.13.0
+phonenumbers==9.0.43

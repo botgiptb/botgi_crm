@@ -38,6 +38,8 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt",
     # Local apps
     "apps.accounts",
+    "apps.leads",
+    "apps.activities",
 ]
 
 MIDDLEWARE = [
