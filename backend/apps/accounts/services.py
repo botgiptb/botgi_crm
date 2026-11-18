@@ -18,6 +18,7 @@ class UserService:
         password: str,
         role: str = User.Role.STAFF,
         phone: str = "",
+        receives_meta_leads: bool = False,
         first_name: str = "",
         last_name: str = "",
     ) -> User:
@@ -39,6 +40,7 @@ class UserService:
             password=password,
             role=role,
             phone=phone,
+            receives_meta_leads=receives_meta_leads,
             first_name=first_name,
             last_name=last_name,
         )

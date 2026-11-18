@@ -272,3 +272,26 @@ class UnprocessedMetaLeadViewSet(viewsets.ModelViewSet):
     queryset = UnprocessedMetaLead.objects.all().order_by("-created_at")
     serializer_class = UnprocessedMetaLeadSerializer
     permission_classes = [IsAuthenticated, IsManagerOrAdmin]
+
+    @action(detail=True, methods=["post"])
+    def resolve(self, request, pk=None):
+        """Manager resolves an unprocessed lead by supplying a valid phone number."""
+        unprocessed = self.get_object()
+        phone = request.data.get("phone", "")
+        if not phone:
+            raise ValidationError({"phone": "Phone number is required to resolve this lead."})
+
+        from apps.integrations_meta.services import MetaLeadService
+
+        try:
+            lead = MetaLeadService.resolve_unprocessed_meta_lead(
+                unprocessed_id=unprocessed.id,
+                phone=phone,
+                user=request.user,
+                name=request.data.get("name", ""),
+                email=request.data.get("email", ""),
+                notes=request.data.get("notes", ""),
+            )
+            return Response(LeadSerializer(lead).data, status=status.HTTP_200_OK)
+        except DjangoValidationError as exc:
+            raise ValidationError(exc.message_dict if hasattr(exc, "message_dict") else str(exc))

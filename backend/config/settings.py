@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     "apps.accounts",
     "apps.leads",
     "apps.activities",
+    "apps.integrations_meta",
 ]
 
 MIDDLEWARE = [
@@ -74,27 +75,43 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 
 # Database Configuration
-DB_ENGINE = os.getenv("DB_ENGINE", "django.db.backends.sqlite3")
-if DB_ENGINE == "django.db.backends.postgresql" or (
-    os.getenv("DB_HOST") and DB_ENGINE != "django.db.backends.sqlite3"
-):
+DATABASE_URL = os.getenv("DATABASE_URL")
+if DATABASE_URL:
+    import urllib.parse
+
+    _db_url = urllib.parse.urlparse(DATABASE_URL)
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
-            "NAME": os.getenv("DB_NAME", "shopcrm"),
-            "USER": os.getenv("DB_USER", "shopcrm"),
-            "PASSWORD": os.getenv("DB_PASSWORD", "shopcrm_password"),
-            "HOST": os.getenv("DB_HOST", "localhost"),
-            "PORT": os.getenv("DB_PORT", "5432"),
+            "NAME": _db_url.path.lstrip("/"),
+            "USER": _db_url.username or "postgres",
+            "PASSWORD": _db_url.password or "",
+            "HOST": _db_url.hostname or "localhost",
+            "PORT": str(_db_url.port or 5432),
         }
     }
 else:
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.sqlite3",
-            "NAME": BASE_DIR / os.getenv("DB_NAME", "db.sqlite3"),
+    DB_ENGINE = os.getenv("DB_ENGINE", "django.db.backends.sqlite3")
+    if DB_ENGINE == "django.db.backends.postgresql" or (
+        os.getenv("DB_HOST") and DB_ENGINE != "django.db.backends.sqlite3"
+    ):
+        DATABASES = {
+            "default": {
+                "ENGINE": "django.db.backends.postgresql",
+                "NAME": os.getenv("DB_NAME", "shopcrm"),
+                "USER": os.getenv("DB_USER", "shopcrm"),
+                "PASSWORD": os.getenv("DB_PASSWORD", "shopcrm_password"),
+                "HOST": os.getenv("DB_HOST", "localhost"),
+                "PORT": os.getenv("DB_PORT", "5432"),
+            }
         }
-    }
+    else:
+        DATABASES = {
+            "default": {
+                "ENGINE": "django.db.backends.sqlite3",
+                "NAME": BASE_DIR / os.getenv("DB_NAME", "db.sqlite3"),
+            }
+        }
 
 # Custom User Model
 AUTH_USER_MODEL = "accounts.User"
@@ -186,10 +203,38 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.activities.tasks.check_and_flag_stale_leads",
         "schedule": crontab(hour=8, minute=30),
     },
+    "sweep-stuck-meta-webhooks-every-5-mins": {
+        "task": "apps.integrations_meta.tasks.sweep_stuck_meta_webhooks",
+        "schedule": crontab(minute="*/5"),
+    },
+    "cleanup-old-meta-logs-daily-at-2am": {
+        "task": "apps.integrations_meta.tasks.cleanup_old_meta_webhook_logs",
+        "schedule": crontab(hour=2, minute=0),
+    },
 }
 
 # Stale lead detection threshold
 STALE_LEAD_THRESHOLD_DAYS = int(os.getenv("STALE_LEAD_THRESHOLD_DAYS", "3"))
+
+# Meta Graph API and Lead Ads Integration
+META_GRAPH_VERSION = os.getenv("META_GRAPH_VERSION", "v22.0")
+META_APP_SECRET = os.getenv("META_APP_SECRET", "")
+META_VERIFY_TOKEN = os.getenv("META_VERIFY_TOKEN", "")
+META_PAGE_ACCESS_TOKEN = os.getenv("META_PAGE_ACCESS_TOKEN", "")
+META_PAGE_ID = os.getenv("META_PAGE_ID", "")
+META_WEBHOOK_MAX_BYTES = int(os.getenv("META_WEBHOOK_MAX_BYTES", str(1024 * 1024)))  # 1 MB
+
+if not DEBUG and not (
+    "pytest" in sys.modules or os.getenv("TESTING", "False").lower() in ("true", "1")
+):
+    import logging
+
+    _meta_logger = logging.getLogger(__name__)
+    if not META_APP_SECRET or not META_VERIFY_TOKEN:
+        _meta_logger.error(
+            "CRITICAL: Meta integration secrets (META_APP_SECRET, META_VERIFY_TOKEN) "
+            "are not configured in production!"
+        )
 
 # Email Configuration
 EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")

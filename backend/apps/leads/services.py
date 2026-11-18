@@ -208,6 +208,9 @@ class LeadService:
                 assigned_to = user
             elif getattr(user, "can_view_all_leads", False):
                 assigned_to = lead_data.get("assigned_to", user)
+        else:
+            # System / webhook creation without user
+            assigned_to = lead_data.get("assigned_to")
 
         lead = Lead.objects.create(
             customer=customer,

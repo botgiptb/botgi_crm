@@ -153,6 +153,9 @@ class NotificationType(models.TextChoices):
     OVERDUE_FOLLOW_UP = "overdue_follow_up", "Overdue Follow-up"
     DAILY_SUMMARY = "daily_summary", "Daily Summary"
     STALE_LEAD = "stale_lead", "Stale Lead"
+    NEW_LEAD = "new_lead", "New Lead"
+    UNPROCESSED_META_LEAD = "unprocessed_meta_lead", "Unprocessed Meta Lead"
+    META_API_ERROR = "meta_api_error", "Meta API Error"
     SYSTEM = "system", "System"
 
 

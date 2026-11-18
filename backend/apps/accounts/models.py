@@ -53,6 +53,8 @@ class User(AbstractUser):
         db_index=True,
     )
     phone = models.CharField(max_length=32, blank=True, default="")
+    receives_meta_leads = models.BooleanField(default=False, db_index=True)
+    last_meta_lead_assigned_at = models.DateTimeField(null=True, blank=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
