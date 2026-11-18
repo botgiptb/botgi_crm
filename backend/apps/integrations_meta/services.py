@@ -329,45 +329,59 @@ class MetaLeadService:
         return response.json()
 
     @classmethod
-    @transaction.atomic
     def process_meta_webhook_log(cls, log_id: int) -> MetaWebhookLog:
         """
-        Process a single MetaWebhookLog row idempotently.
-        Handles leadgen fetch, phone validation, customer dedupe, assignment, and notifications.
+        Process a single MetaWebhookLog row idempotently in two short transactions:
+        1. Claim transaction: locks row, verifies status, increments attempts, commits.
+        2. Graph HTTP call: performed OUTSIDE any transaction or row lock.
+        3. Processing transaction: re-checks status, processes lead, assigns, updates log, commits.
         """
-        log = MetaWebhookLog.objects.select_for_update(of=("self",)).get(pk=log_id)
+        # Step 1: Claim transaction (short atomic block)
+        with transaction.atomic():
+            log = MetaWebhookLog.objects.select_for_update(of=("self",)).get(pk=log_id)
 
-        # Skip if already processed or duplicate
-        if log.status in (WebhookLogStatus.PROCESSED, WebhookLogStatus.DUPLICATE):
-            return log
+            # Skip if already processed, duplicate, or exhausted
+            if log.status in (WebhookLogStatus.PROCESSED, WebhookLogStatus.DUPLICATE):
+                return log
+            if log.attempts >= MAX_WEBHOOK_ATTEMPTS:
+                if log.status != WebhookLogStatus.ERROR:
+                    log.status = WebhookLogStatus.ERROR
+                    log.error_message = "Retries exhausted"
+                    log.processed_at = timezone.now()
+                    log.save(update_fields=["status", "error_message", "processed_at"])
+                return log
 
-        log.attempts += 1
+            log.attempts += 1
+            log.save(update_fields=["attempts"])
 
         meta_lead_id = log.meta_lead_id
         payload = log.payload or {}
 
-        # 1. Idempotency check: Does Lead or UnprocessedMetaLead already have this meta_lead_id?
+        # Quick idempotency check before HTTP call
         if meta_lead_id:
             existing_lead = Lead.objects.filter(meta_lead_id=meta_lead_id).first()
             if existing_lead:
-                log.status = WebhookLogStatus.DUPLICATE
-                log.lead = existing_lead
-                log.processed_at = timezone.now()
-                log.save(update_fields=["status", "lead", "processed_at", "attempts"])
+                with transaction.atomic():
+                    log = MetaWebhookLog.objects.select_for_update(of=("self",)).get(pk=log_id)
+                    log.status = WebhookLogStatus.DUPLICATE
+                    log.lead = existing_lead
+                    log.processed_at = timezone.now()
+                    log.save(update_fields=["status", "lead", "processed_at"])
                 return log
 
             existing_unprocessed = UnprocessedMetaLead.objects.filter(
                 meta_lead_id=meta_lead_id
             ).first()
             if existing_unprocessed:
-                log.status = WebhookLogStatus.DUPLICATE
-                log.unprocessed_lead = existing_unprocessed
-                log.processed_at = timezone.now()
-                log.save(update_fields=["status", "unprocessed_lead", "processed_at", "attempts"])
+                with transaction.atomic():
+                    log = MetaWebhookLog.objects.select_for_update(of=("self",)).get(pk=log_id)
+                    log.status = WebhookLogStatus.DUPLICATE
+                    log.unprocessed_lead = existing_unprocessed
+                    log.processed_at = timezone.now()
+                    log.save(update_fields=["status", "unprocessed_lead", "processed_at"])
                 return log
 
-        # 2. Extract or fetch lead data
-        # Check if full lead data is already in payload (e.g. in tests/mocks or direct ingestion)
+        # Step 2: Fetch lead data OUTSIDE transaction (no database row lock held)
         lead_data = payload.get("lead_data")
         if not lead_data and "field_data" in payload:
             lead_data = payload
@@ -376,144 +390,144 @@ class MetaLeadService:
             try:
                 lead_data = cls.fetch_lead_from_graph_api(meta_lead_id)
             except MetaGraphPermanentError as err:
-                log.status = WebhookLogStatus.ERROR
-                log.error_message = err.message
-                log.processed_at = timezone.now()
-                log.save(update_fields=["status", "error_message", "processed_at", "attempts"])
-                # Notify managers about the permanent token/API failure
+                with transaction.atomic():
+                    log = MetaWebhookLog.objects.select_for_update(of=("self",)).get(pk=log_id)
+                    log.status = WebhookLogStatus.ERROR
+                    log.error_message = err.message
+                    log.processed_at = timezone.now()
+                    log.save(update_fields=["status", "error_message", "processed_at"])
                 cls.notify_managers_of_api_error(log)
                 return log
             except Exception as exc:
-                # Check if retry limit reached
                 if log.attempts >= MAX_WEBHOOK_ATTEMPTS:
-                    log.status = WebhookLogStatus.ERROR
-                    log.error_message = f"Retries exhausted: {str(exc)}"
-                    log.processed_at = timezone.now()
-                    log.save(update_fields=["status", "error_message", "processed_at", "attempts"])
+                    with transaction.atomic():
+                        log = MetaWebhookLog.objects.select_for_update(of=("self",)).get(pk=log_id)
+                        log.status = WebhookLogStatus.ERROR
+                        log.error_message = f"Retries exhausted: {str(exc)}"
+                        log.processed_at = timezone.now()
+                        log.save(update_fields=["status", "error_message", "processed_at"])
                     return log
-                log.save(update_fields=["attempts"])
+                # Re-raise transient exception for Celery retry (attempts already incremented in Step 1)
                 raise exc
 
         if not lead_data:
             lead_data = payload
 
-        # 3. Parse and extract fields
-        parsed = MetaFieldMapper.extract_lead_fields(lead_data)
-        phone = parsed.get("phone", "")
-        extracted_meta_lead_id = meta_lead_id or str(lead_data.get("id") or "")
-        campaign_name = parsed.get("campaign_name") or payload.get("campaign_name", "")
-        ad_id = parsed.get("ad_id") or str(payload.get("ad_id", ""))
-        form_id = parsed.get("form_id") or str(payload.get("form_id", ""))
-
-        # 4. If phone is missing: store in UnprocessedMetaLead and notify managers
-        if not phone or not phone.strip():
-            try:
-                unprocessed = UnprocessedMetaLead.objects.create(
-                    meta_lead_id=extracted_meta_lead_id
-                    or f"meta_nophone_{timezone.now().timestamp()}",
-                    campaign_name=campaign_name,
-                    ad_id=ad_id,
-                    form_id=form_id,
-                    raw_payload=lead_data,
-                    review_notes="Meta lead ingested without a phone number; awaiting manager review.",
-                )
-            except IntegrityError:
-                # Concurrent delivery created the unprocessed lead
-                existing_unprocessed = UnprocessedMetaLead.objects.filter(
-                    meta_lead_id=extracted_meta_lead_id
-                ).first()
-                log.status = WebhookLogStatus.DUPLICATE
-                log.unprocessed_lead = existing_unprocessed
-                log.processed_at = timezone.now()
-                log.save(update_fields=["status", "unprocessed_lead", "processed_at", "attempts"])
+        # Step 3: Second transaction to re-check status, create lead, and update log
+        with transaction.atomic():
+            log = MetaWebhookLog.objects.select_for_update(of=("self",)).get(pk=log_id)
+            if log.status in (WebhookLogStatus.PROCESSED, WebhookLogStatus.DUPLICATE):
                 return log
 
-            log.status = WebhookLogStatus.PROCESSED
-            log.unprocessed_lead = unprocessed
-            log.processed_at = timezone.now()
-            log.save(update_fields=["status", "unprocessed_lead", "processed_at", "attempts"])
+            parsed = MetaFieldMapper.extract_lead_fields(lead_data)
+            phone = parsed.get("phone", "")
+            extracted_meta_lead_id = meta_lead_id or str(lead_data.get("id") or "")
+            campaign_name = parsed.get("campaign_name") or payload.get("campaign_name", "")
+            ad_id = parsed.get("ad_id") or str(payload.get("ad_id", ""))
+            form_id = parsed.get("form_id") or str(payload.get("form_id", ""))
 
-            # Notify managers
-            cls.notify_managers_of_unprocessed_lead(unprocessed)
-            return log
+            # 4. If phone is missing: store in UnprocessedMetaLead and notify managers
+            if not phone or not phone.strip():
+                try:
+                    unprocessed = UnprocessedMetaLead.objects.create(
+                        meta_lead_id=extracted_meta_lead_id
+                        or f"meta_nophone_{timezone.now().timestamp()}",
+                        campaign_name=campaign_name,
+                        ad_id=ad_id,
+                        form_id=form_id,
+                        raw_payload=lead_data,
+                        review_notes="Meta lead ingested without a phone number; awaiting manager review.",
+                    )
+                except IntegrityError:
+                    existing_unprocessed = UnprocessedMetaLead.objects.filter(
+                        meta_lead_id=extracted_meta_lead_id
+                    ).first()
+                    log.status = WebhookLogStatus.DUPLICATE
+                    log.unprocessed_lead = existing_unprocessed
+                    log.processed_at = timezone.now()
+                    log.save(update_fields=["status", "unprocessed_lead", "processed_at"])
+                    return log
 
-        # 5. If phone is present: create Customer + Lead with assignment routing
-        customer_name = parsed.get("name") or "Meta Ad Inquiry"
-        try:
-            customer, _ = CustomerService.get_or_create_customer(
-                phone=phone,
-                name=customer_name,
-                email=parsed.get("email", ""),
-                created_by=None,
-            )
+                log.status = WebhookLogStatus.PROCESSED
+                log.unprocessed_lead = unprocessed
+                log.processed_at = timezone.now()
+                log.save(update_fields=["status", "unprocessed_lead", "processed_at"])
 
-            # Determine assignee (customer affinity or round-robin)
-            assignee = MetaAssignmentService.determine_lead_assignee(customer)
+                cls.notify_managers_of_unprocessed_lead(unprocessed)
+                return log
 
-            raw_meta = dict(parsed.get("raw_meta_data", {}))
-            if parsed.get("meta_created_time"):
-                raw_meta["created_time"] = parsed["meta_created_time"]
-
-            # Create lead using LeadService
-            result = LeadService.create_lead(
-                customer_data={
-                    "phone": phone,
-                    "name": customer_name,
-                    "email": parsed.get("email", ""),
-                },
-                lead_data={
-                    "source": LeadSource.META_LEAD_ADS,
-                    "meta_lead_id": extracted_meta_lead_id,
-                    "campaign_name": campaign_name,
-                    "ad_id": ad_id,
-                    "form_id": form_id,
-                    "product_category": parsed.get("product_category", ""),
-                    "budget_min": parsed.get("budget_min"),
-                    "budget_max": parsed.get("budget_max"),
-                    "raw_meta_data": raw_meta,
-                    "assigned_to": assignee,
-                },
-                user=None,  # System/webhook creation
-            )
-            lead = result.get("lead")
-
-            # Update assigned_to and lead assignment if routing selected an assignee
-            if lead and assignee and lead.assigned_to != assignee:
-                lead.assigned_to = assignee
-                lead.save(update_fields=["assigned_to", "updated_at"])
-                LeadAssignment.objects.create(
-                    lead=lead,
-                    assigned_by=None,
-                    from_user=None,
-                    to_user=assignee,
-                    reason="Auto-assigned via Meta Lead Ads routing",
+            # 5. If phone is present: create Customer + Lead with assignment routing
+            customer_name = parsed.get("name") or "Meta Ad Inquiry"
+            try:
+                customer, _ = CustomerService.get_or_create_customer(
+                    phone=phone,
+                    name=customer_name,
+                    email=parsed.get("email", ""),
+                    created_by=None,
                 )
 
-            # Send Notification to assignee
-            if lead and assignee:
-                NotificationService.create_notification(
-                    user=assignee,
-                    notification_type=NotificationType.NEW_LEAD,
-                    dedupe_key=f"new_lead:{lead.id}:{assignee.id}",
-                    title=f"New Lead: {customer.name}",
-                    message=f"New lead from Meta Lead Ads ({lead.campaign_name or 'Campaign'}) assigned to you for {customer.name} ({customer.phone}).",
-                    lead=lead,
+                assignee = MetaAssignmentService.determine_lead_assignee(customer)
+
+                raw_meta = dict(parsed.get("raw_meta_data", {}))
+                if parsed.get("meta_created_time"):
+                    raw_meta["created_time"] = parsed["meta_created_time"]
+
+                result = LeadService.create_lead(
+                    customer_data={
+                        "phone": phone,
+                        "name": customer_name,
+                        "email": parsed.get("email", ""),
+                    },
+                    lead_data={
+                        "source": LeadSource.META_LEAD_ADS,
+                        "meta_lead_id": extracted_meta_lead_id,
+                        "campaign_name": campaign_name,
+                        "ad_id": ad_id,
+                        "form_id": form_id,
+                        "product_category": parsed.get("product_category", ""),
+                        "budget_min": parsed.get("budget_min"),
+                        "budget_max": parsed.get("budget_max"),
+                        "raw_meta_data": raw_meta,
+                        "assigned_to": assignee,
+                    },
+                    user=None,
                 )
+                lead = result.get("lead")
 
-            log.status = WebhookLogStatus.PROCESSED
-            log.lead = lead
-            log.processed_at = timezone.now()
-            log.save(update_fields=["status", "lead", "processed_at", "attempts"])
-            return log
+                if lead and assignee and lead.assigned_to != assignee:
+                    lead.assigned_to = assignee
+                    lead.save(update_fields=["assigned_to", "updated_at"])
+                    LeadAssignment.objects.create(
+                        lead=lead,
+                        assigned_by=None,
+                        from_user=None,
+                        to_user=assignee,
+                        reason="Auto-assigned via Meta Lead Ads routing",
+                    )
 
-        except IntegrityError:
-            # Concurrent delivery duplicate
-            existing_lead = Lead.objects.filter(meta_lead_id=extracted_meta_lead_id).first()
-            log.status = WebhookLogStatus.DUPLICATE
-            log.lead = existing_lead
-            log.processed_at = timezone.now()
-            log.save(update_fields=["status", "lead", "processed_at", "attempts"])
-            return log
+                if lead and assignee:
+                    NotificationService.create_notification(
+                        user=assignee,
+                        notification_type=NotificationType.NEW_LEAD,
+                        dedupe_key=f"new_lead:{lead.id}:{assignee.id}",
+                        title=f"New Lead: {customer.name}",
+                        message=f"New lead from Meta Lead Ads ({lead.campaign_name or 'Campaign'}) assigned to you for {customer.name} ({customer.phone}).",
+                        lead=lead,
+                    )
+
+                log.status = WebhookLogStatus.PROCESSED
+                log.lead = lead
+                log.processed_at = timezone.now()
+                log.save(update_fields=["status", "lead", "processed_at"])
+                return log
+
+            except IntegrityError:
+                existing_lead = Lead.objects.filter(meta_lead_id=extracted_meta_lead_id).first()
+                log.status = WebhookLogStatus.DUPLICATE
+                log.lead = existing_lead
+                log.processed_at = timezone.now()
+                log.save(update_fields=["status", "lead", "processed_at"])
+                return log
 
     @staticmethod
     def notify_managers_of_unprocessed_lead(unprocessed: UnprocessedMetaLead):

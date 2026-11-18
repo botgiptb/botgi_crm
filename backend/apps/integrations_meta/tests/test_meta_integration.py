@@ -5,6 +5,7 @@ from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
 import pytest
+import requests
 from django.db import transaction
 from django.test import override_settings
 from django.utils import timezone
@@ -15,6 +16,7 @@ from apps.accounts.models import User
 from apps.accounts.services import UserService
 from apps.activities.models import Notification, NotificationType
 from apps.integrations_meta.models import MetaWebhookLog, WebhookLogStatus
+from apps.integrations_meta.services import MetaLeadService
 from apps.integrations_meta.tasks import (
     cleanup_old_meta_webhook_logs,
     process_meta_lead_payload,
@@ -690,6 +692,43 @@ class TestMetaLeadIngestionAndProcessing:
         assert notif is not None
         assert "expired_token_lead" in notif.message
 
+    @patch("requests.get")
+    def test_failure_after_claim_leaves_attempts_incremented(self, mock_get, meta_users):
+        """
+        Verify that when a failure occurs during the Graph API call (outside the transaction),
+        the claim transaction has already committed, leaving attempts incremented.
+        """
+        mock_get.side_effect = requests.exceptions.ConnectionError("Network connection reset")
+
+        log = MetaWebhookLog.objects.create(
+            meta_lead_id="transient_fail_lead_01",
+            payload={"leadgen_id": "transient_fail_lead_01"},
+            status=WebhookLogStatus.RECEIVED,
+            attempts=0,
+        )
+
+        # First failure: attempts incremented to 1 and exception re-raised for Celery retry
+        with pytest.raises(requests.exceptions.ConnectionError):
+            MetaLeadService.process_meta_webhook_log(log.id)
+
+        log.refresh_from_db()
+        assert log.attempts == 1
+        assert log.status == WebhookLogStatus.RECEIVED  # Still received, waiting for retry
+
+        # Second failure: attempts incremented to 2
+        with pytest.raises(requests.exceptions.ConnectionError):
+            MetaLeadService.process_meta_webhook_log(log.id)
+
+        log.refresh_from_db()
+        assert log.attempts == 2
+
+        # Third failure: attempts reaches 3 (MAX_WEBHOOK_ATTEMPTS), marked as ERROR
+        MetaLeadService.process_meta_webhook_log(log.id)
+        log.refresh_from_db()
+        assert log.attempts == 3
+        assert log.status == WebhookLogStatus.ERROR
+        assert "Retries exhausted" in log.error_message
+
 
 @pytest.mark.django_db(transaction=True)
 class TestMetaManagerResolveAndMaintenance:
@@ -788,6 +827,29 @@ class TestMetaManagerResolveAndMaintenance:
 
         exhausted_log.refresh_from_db()
         assert exhausted_log.status == WebhookLogStatus.ERROR
+
+    def test_sweep_stops_after_attempt_limit(self):
+        """Sweep task strictly ignores logs that have already reached or exceeded MAX_WEBHOOK_ATTEMPTS."""
+        now = timezone.now()
+        # Row already at attempt limit and marked ERROR
+        error_log = MetaWebhookLog.objects.create(
+            meta_lead_id="already_error_lead",
+            status=WebhookLogStatus.ERROR,
+            attempts=3,
+        )
+        MetaWebhookLog.objects.filter(id=error_log.id).update(
+            created_at=now - timedelta(minutes=15)
+        )
+
+        # Run sweep
+        result = sweep_stuck_meta_webhooks()
+        assert result["requeued"] == 0
+        assert result["exhausted"] == 0
+
+        # Row remains untouched with attempts unchanged
+        error_log.refresh_from_db()
+        assert error_log.attempts == 3
+        assert error_log.status == WebhookLogStatus.ERROR
 
     def test_cleanup_old_meta_webhook_logs(self):
         """Retention task deletes webhook logs older than 90 days."""

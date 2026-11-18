@@ -146,7 +146,7 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Reverse Proxy (Nginx)
-NUM_PROXIES = int(os.getenv("NUM_PROXIES", "1"))
+NUM_PROXIES = int(os.getenv("NUM_PROXIES", "0"))
 
 # Django REST Framework
 REST_FRAMEWORK = {
@@ -190,11 +190,6 @@ CELERY_RESULT_BACKEND = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 CELERY_TASK_ACKS_LATE = True
 CELERY_TASK_REJECT_ON_WORKER_LOST = True
 
-if "pytest" in sys.modules or os.getenv("TESTING", "False").lower() in ("true", "1"):
-    CELERY_TASK_ALWAYS_EAGER = True
-    CELERY_TASK_EAGER_PROPAGATES = True
-    PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
-
 CELERY_BEAT_SCHEDULE = {
     "notify-overdue-followups-every-15-mins": {
         "task": "apps.activities.tasks.notify_overdue_followups",
@@ -222,16 +217,14 @@ CELERY_BEAT_SCHEDULE = {
 STALE_LEAD_THRESHOLD_DAYS = int(os.getenv("STALE_LEAD_THRESHOLD_DAYS", "3"))
 
 # Meta Graph API and Lead Ads Integration
-META_GRAPH_VERSION = os.getenv("META_GRAPH_VERSION", "v22.0")
+META_GRAPH_VERSION = os.getenv("META_GRAPH_VERSION", "v27.0")
 META_APP_SECRET = os.getenv("META_APP_SECRET", "")
 META_VERIFY_TOKEN = os.getenv("META_VERIFY_TOKEN", "")
 META_PAGE_ACCESS_TOKEN = os.getenv("META_PAGE_ACCESS_TOKEN", "")
 META_PAGE_ID = os.getenv("META_PAGE_ID", "")
 META_WEBHOOK_MAX_BYTES = int(os.getenv("META_WEBHOOK_MAX_BYTES", str(1024 * 1024)))  # 1 MB
 
-if not DEBUG and not (
-    "pytest" in sys.modules or os.getenv("TESTING", "False").lower() in ("true", "1")
-):
+if not DEBUG:
     import logging
 
     _meta_logger = logging.getLogger(__name__)

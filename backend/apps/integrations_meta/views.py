@@ -168,7 +168,8 @@ class MetaWebhookLogViewSet(
         log = self.get_object()
         log.status = WebhookLogStatus.RECEIVED
         log.error_message = ""
-        log.save(update_fields=["status", "error_message"])
+        log.attempts = 0
+        log.save(update_fields=["status", "error_message", "attempts"])
 
         process_meta_lead_payload.delay(log.id)
         return Response(
