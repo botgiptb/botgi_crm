@@ -1,6 +1,7 @@
 from datetime import timedelta
 
 import pytest
+from django.core.exceptions import ValidationError
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
@@ -187,3 +188,46 @@ class TestActivityAndFollowUp:
         fup_ids = [f["id"] for f in res_overdue.data]
         assert fup1.id in fup_ids
         assert fup2.id not in fup_ids
+
+    def test_staff_cannot_log_activity_or_follow_up_on_unassigned_lead(self):
+        # Lead for staff2
+        res2 = LeadService.create_lead(
+            customer_data={"phone": "9876543211", "name": "Staff2 Customer"},
+            lead_data={"title": "Staff2 Lead"},
+            user=self.staff2,
+        )
+        lead2 = res2["lead"]
+
+        # 1. Direct service call by staff1 raises ValidationError
+        with pytest.raises(
+            ValidationError, match="Staff can only log activities on leads assigned to them"
+        ):
+            ActivityService.log_activity(
+                lead_id=lead2.id,
+                user=self.staff1,
+                activity_type=ActivityType.CALL,
+                title="Staff 1 trying to log on Staff 2's lead",
+            )
+
+        # 2. API call by staff1 to /api/activities/ returns 400 Bad Request
+        client = APIClient()
+        client.force_authenticate(user=self.staff1)
+        response = client.post(
+            "/api/activities/",
+            {
+                "lead": lead2.id,
+                "activity_type": ActivityType.CALL,
+                "title": "Unauthorized attempt",
+            },
+            format="json",
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+        # 3. Manager can log activity on any lead
+        manager_act = ActivityService.log_activity(
+            lead_id=lead2.id,
+            user=self.admin,
+            activity_type=ActivityType.CALL,
+            title="Admin check-in",
+        )
+        assert manager_act.id is not None

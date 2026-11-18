@@ -4,7 +4,7 @@ from rest_framework.test import APIClient
 
 from apps.accounts.models import User
 from apps.accounts.services import UserService
-from apps.leads.models import LeadSource, Stage
+from apps.leads.models import LeadSource, Stage, UnprocessedMetaLead
 from apps.leads.services import LeadService
 
 
@@ -172,3 +172,34 @@ class TestLeadEndpointsAndPermissions:
         )
         assert response.status_code == status.HTTP_200_OK
         assert response.data["stage_slug"] == "contacted"
+
+    def test_unprocessed_meta_lead_endpoints_manager_admin_only(self):
+        item = UnprocessedMetaLead.objects.create(
+            meta_lead_id="meta_test_999",
+            campaign_name="Test Campaign",
+            raw_payload={"sample": "data"},
+        )
+
+        # 1. Staff is strictly forbidden (403)
+        self.client.force_authenticate(user=self.staff1)
+        res_list_staff = self.client.get("/api/meta-unprocessed/")
+        assert res_list_staff.status_code == status.HTTP_403_FORBIDDEN
+
+        res_detail_staff = self.client.get(f"/api/meta-unprocessed/{item.id}/")
+        assert res_detail_staff.status_code == status.HTTP_403_FORBIDDEN
+
+        # 2. Manager has full access (200)
+        self.client.force_authenticate(user=self.manager)
+        res_list_mgr = self.client.get("/api/meta-unprocessed/")
+        assert res_list_mgr.status_code == status.HTTP_200_OK
+        assert len(res_list_mgr.data["results"]) >= 1
+
+        # Manager can update / resolve
+        res_patch_mgr = self.client.patch(
+            f"/api/meta-unprocessed/{item.id}/",
+            {"is_resolved": True, "review_notes": "Reviewed and resolved."},
+            format="json",
+        )
+        assert res_patch_mgr.status_code == status.HTTP_200_OK
+        item.refresh_from_db()
+        assert item.is_resolved is True

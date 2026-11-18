@@ -26,6 +26,11 @@ class ActivityService:
             raise ValidationError({"activity_type": f"Invalid activity type: {activity_type}."})
 
         lead = Lead.objects.select_for_update().get(pk=lead_id)
+        if user and user.is_authenticated and not getattr(user, "can_view_all_leads", False):
+            if lead.assigned_to != user:
+                raise ValidationError(
+                    {"lead": "Staff can only log activities on leads assigned to them."}
+                )
         effective_time = occurred_at or timezone.now()
 
         activity = Activity.objects.create(
@@ -61,6 +66,11 @@ class FollowUpService:
         assigned_to=None,
     ) -> FollowUp:
         lead = Lead.objects.get(pk=lead_id)
+        if user and user.is_authenticated and not getattr(user, "can_view_all_leads", False):
+            if lead.assigned_to != user:
+                raise ValidationError(
+                    {"lead": "Staff can only schedule follow-ups on leads assigned to them."}
+                )
 
         target_assignee = assigned_to or lead.assigned_to or user
         return FollowUp.objects.create(

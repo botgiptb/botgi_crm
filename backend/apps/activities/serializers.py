@@ -24,6 +24,15 @@ class ActivitySerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "user", "user_name", "is_outbound", "created_at"]
 
+    def validate_lead(self, value):
+        user = self.context["request"].user
+        if user and not getattr(user, "can_view_all_leads", False):
+            if value.assigned_to != user:
+                raise serializers.ValidationError(
+                    "Staff can only log activities on leads assigned to them."
+                )
+        return value
+
     def create(self, validated_data):
         user = self.context["request"].user
         lead = validated_data.pop("lead")
@@ -69,6 +78,15 @@ class FollowUpSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
+
+    def validate_lead(self, value):
+        user = self.context["request"].user
+        if user and not getattr(user, "can_view_all_leads", False):
+            if value.assigned_to != user:
+                raise serializers.ValidationError(
+                    "Staff can only schedule follow-ups on leads assigned to them."
+                )
+        return value
 
     def create(self, validated_data):
         user = self.context["request"].user
