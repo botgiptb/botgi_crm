@@ -75,10 +75,19 @@ class MetaSecurityService:
 
     @staticmethod
     def get_client_ip(request) -> str:
-        """Extract client IP, deliberately handling X-Forwarded-For."""
+        """
+        Extract client IP using NUM_PROXIES from the right of X-Forwarded-For.
+        When behind Nginx, Nginx appends the connecting client IP to the end of the header.
+        Taking the rightmost client IP index prevents clients from spoofing their IP
+        by prepending fake IPs to X-Forwarded-For.
+        """
+        num_proxies = getattr(settings, "NUM_PROXIES", 1)
         x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
         if x_forwarded_for:
-            return x_forwarded_for.split(",")[0].strip()
+            ips = [ip.strip() for ip in x_forwarded_for.split(",") if ip.strip()]
+            if len(ips) >= num_proxies:
+                return ips[-num_proxies]
+            return ips[0]
         return request.META.get("REMOTE_ADDR", "")
 
 

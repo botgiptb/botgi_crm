@@ -87,6 +87,15 @@ class MetaWebhookView(View):
         if not MetaSecurityService.verify_signature(raw_body, sig_header):
             client_ip = MetaSecurityService.get_client_ip(request)
             logger.warning("Invalid Meta webhook signature from %s", client_ip)
+
+            # Throttle only failed signature requests (max 10 failed attempts/min per IP)
+            from django.core.cache import cache
+
+            cache_key = f"meta_failed_sig_throttle:{client_ip}"
+            failed_count = cache.get(cache_key, 0)
+            if failed_count >= 10:
+                return HttpResponse("Too Many Requests", status=429)
+            cache.set(cache_key, failed_count + 1, timeout=60)
             return HttpResponseForbidden("Invalid webhook signature")
 
         # Parse JSON

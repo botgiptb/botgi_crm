@@ -233,6 +233,51 @@ class TestMetaWebhookHandshakeAndSecurity:
             assert resp2.status_code == status.HTTP_200_OK
             assert MetaWebhookLog.objects.count() == 0
 
+    def test_spoofed_forwarded_for_cannot_exhaust_victim_ip_bucket(self, api_client):
+        """
+        Attacker spoofing client IP by prepending victim IP to X-Forwarded-For
+        cannot exhaust the victim's throttle bucket.
+        """
+        from django.core.cache import cache
+
+        cache.clear()
+        bad_payload = b'{"object": "page"}'
+        victim_ip = "203.0.113.195"
+        attacker_ip = "198.51.100.4"
+
+        with override_settings(META_APP_SECRET=TEST_SECRET, NUM_PROXIES=1):
+            # Attacker sends 10 requests with invalid signature and spoofed X-Forwarded-For
+            spoofed_header = f"{victim_ip}, {attacker_ip}"
+            for _ in range(10):
+                resp = api_client.post(
+                    "/api/integrations/meta/webhook/",
+                    data=bad_payload,
+                    content_type="application/json",
+                    HTTP_X_FORWARDED_FOR=spoofed_header,
+                    HTTP_X_HUB_SIGNATURE_256="sha256=invalid_signature",
+                )
+                assert resp.status_code == status.HTTP_403_FORBIDDEN
+
+            # 11th request from attacker IP is throttled
+            resp_attacker_throttled = api_client.post(
+                "/api/integrations/meta/webhook/",
+                data=bad_payload,
+                content_type="application/json",
+                HTTP_X_FORWARDED_FOR=spoofed_header,
+                HTTP_X_HUB_SIGNATURE_256="sha256=invalid_signature",
+            )
+            assert resp_attacker_throttled.status_code == status.HTTP_429_TOO_MANY_REQUESTS
+
+            # Victim IP itself is NOT throttled (gets 403, not 429)
+            resp_victim = api_client.post(
+                "/api/integrations/meta/webhook/",
+                data=bad_payload,
+                content_type="application/json",
+                HTTP_X_FORWARDED_FOR=victim_ip,
+                HTTP_X_HUB_SIGNATURE_256="sha256=invalid_signature",
+            )
+            assert resp_victim.status_code == status.HTTP_403_FORBIDDEN
+
 
 @pytest.mark.django_db(transaction=True)
 class TestMetaLeadIngestionAndProcessing:
@@ -520,6 +565,61 @@ class TestMetaLeadIngestionAndProcessing:
         assert assignee1 is not None
         assert assignee2 is not None
         assert assignee1.id != assignee2.id
+
+    def test_single_eligible_staff_concurrent_leads_and_non_flagged_never_picked(self, meta_users):
+        """
+        With exactly one eligible staff member, concurrent leads all go to that member,
+        and staff with receives_meta_leads=False are never picked.
+        """
+        # Flag only staff1; unflag staff2 and staff_no_leads
+        meta_users["staff1"].receives_meta_leads = True
+        meta_users["staff1"].save()
+        meta_users["staff2"].receives_meta_leads = False
+        meta_users["staff2"].save()
+        meta_users["staff_no_leads"].receives_meta_leads = False
+        meta_users["staff_no_leads"].save()
+
+        # Ingest Lead A
+        log_a = MetaWebhookLog.objects.create(
+            meta_lead_id="single_staff_lead_a",
+            payload={
+                "leadgen_id": "single_staff_lead_a",
+                "lead_data": {
+                    "field_data": [
+                        {"name": "name", "values": ["Cust A"]},
+                        {"name": "phone", "values": ["+919000000010"]},
+                    ]
+                },
+            },
+        )
+        process_meta_lead_payload(log_a.id)
+        log_a.refresh_from_db()
+
+        # Ingest Lead B
+        log_b = MetaWebhookLog.objects.create(
+            meta_lead_id="single_staff_lead_b",
+            payload={
+                "leadgen_id": "single_staff_lead_b",
+                "lead_data": {
+                    "field_data": [
+                        {"name": "name", "values": ["Cust B"]},
+                        {"name": "phone", "values": ["+919000000020"]},
+                    ]
+                },
+            },
+        )
+        process_meta_lead_payload(log_b.id)
+        log_b.refresh_from_db()
+
+        # Both leads must go to staff1 (the single eligible staff member)
+        assert log_a.lead.assigned_to == meta_users["staff1"]
+        assert log_b.lead.assigned_to == meta_users["staff1"]
+
+        # Non-flagged staff are never picked
+        assert log_a.lead.assigned_to != meta_users["staff2"]
+        assert log_b.lead.assigned_to != meta_users["staff2"]
+        assert log_a.lead.assigned_to != meta_users["staff_no_leads"]
+        assert log_b.lead.assigned_to != meta_users["staff_no_leads"]
 
     @patch("requests.get")
     def test_real_webhook_fetches_lead_from_graph_api(self, mock_get, meta_users):

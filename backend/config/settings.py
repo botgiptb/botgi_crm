@@ -145,6 +145,9 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 # Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+# Reverse Proxy (Nginx)
+NUM_PROXIES = int(os.getenv("NUM_PROXIES", "1"))
+
 # Django REST Framework
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
@@ -154,6 +157,7 @@ REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
     "DATETIME_FORMAT": "%Y-%m-%dT%H:%M:%SZ",
+    "NUM_PROXIES": NUM_PROXIES,
 }
 
 # SimpleJWT Settings
@@ -189,6 +193,7 @@ CELERY_TASK_REJECT_ON_WORKER_LOST = True
 if "pytest" in sys.modules or os.getenv("TESTING", "False").lower() in ("true", "1"):
     CELERY_TASK_ALWAYS_EAGER = True
     CELERY_TASK_EAGER_PROPAGATES = True
+    PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 
 CELERY_BEAT_SCHEDULE = {
     "notify-overdue-followups-every-15-mins": {
