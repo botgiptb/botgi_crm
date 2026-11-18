@@ -159,3 +159,43 @@ CORS_ALLOWED_ORIGINS = [
     ).split(",")
     if origin.strip()
 ]
+
+# Celery Configuration
+from celery.schedules import crontab  # noqa: E402
+
+CELERY_TIMEZONE = "Asia/Kolkata"
+CELERY_BROKER_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+CELERY_RESULT_BACKEND = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+CELERY_TASK_ACKS_LATE = True
+CELERY_TASK_REJECT_ON_WORKER_LOST = True
+
+if "pytest" in sys.modules or os.getenv("TESTING", "False").lower() in ("true", "1"):
+    CELERY_TASK_ALWAYS_EAGER = True
+    CELERY_TASK_EAGER_PROPAGATES = True
+
+CELERY_BEAT_SCHEDULE = {
+    "notify-overdue-followups-every-15-mins": {
+        "task": "apps.activities.tasks.notify_overdue_followups",
+        "schedule": crontab(minute="*/15"),
+    },
+    "daily-morning-summary-at-9am": {
+        "task": "apps.activities.tasks.send_daily_summary",
+        "schedule": crontab(hour=9, minute=0),
+    },
+    "check-stale-leads-daily-at-830am": {
+        "task": "apps.activities.tasks.check_and_flag_stale_leads",
+        "schedule": crontab(hour=8, minute=30),
+    },
+}
+
+# Stale lead detection threshold
+STALE_LEAD_THRESHOLD_DAYS = int(os.getenv("STALE_LEAD_THRESHOLD_DAYS", "3"))
+
+# Email Configuration
+EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
+EMAIL_HOST = os.getenv("EMAIL_HOST", "localhost")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", 587))
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True").lower() in ("true", "1")
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "Shop CRM <noreply@shopcrm.local>")

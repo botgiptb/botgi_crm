@@ -5,13 +5,14 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from apps.activities.models import Activity, FollowUp
+from apps.activities.models import Activity, FollowUp, Notification
 from apps.activities.serializers import (
     ActivitySerializer,
     CompleteFollowUpSerializer,
     FollowUpSerializer,
+    NotificationSerializer,
 )
-from apps.activities.services import FollowUpService
+from apps.activities.services import FollowUpService, NotificationService
 from apps.leads.permissions import IsAssignedStaffOrManagerOrAdmin
 
 
@@ -84,3 +85,39 @@ class FollowUpViewSet(viewsets.ModelViewSet):
             return Response(FollowUpSerializer(cancelled).data)
         except DjangoValidationError as exc:
             raise ValidationError(exc.message_dict if hasattr(exc, "message_dict") else str(exc))
+
+
+class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    User in-app notifications.
+    Strictly scoped to the authenticated user. Requests for other users' notifications return 404.
+    """
+
+    serializer_class = NotificationSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return (
+            Notification.objects.filter(user=self.request.user)
+            .select_related("lead", "follow_up")
+            .order_by("-created_at")
+        )
+
+    @action(detail=False, methods=["get"])
+    def unread_count(self, request):
+        """Return the count of unread notifications for badge."""
+        count = self.get_queryset().filter(read_at__isnull=True).count()
+        return Response({"unread_count": count})
+
+    @action(detail=True, methods=["post"])
+    def mark_read(self, request, pk=None):
+        """Mark single notification as read (returns 404 if not owned by request.user)."""
+        notif = self.get_object()
+        updated = NotificationService.mark_read(notif.id, request.user)
+        return Response(NotificationSerializer(updated).data)
+
+    @action(detail=False, methods=["post"])
+    def mark_all_read(self, request):
+        """Mark all unread notifications as read for current user."""
+        count = NotificationService.mark_all_read(request.user)
+        return Response({"marked_read": count})

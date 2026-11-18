@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from apps.activities.models import Activity, FollowUp, ReminderType
+from apps.activities.models import Activity, FollowUp, Notification, ReminderType
 from apps.activities.services import ActivityService, FollowUpService
 
 
@@ -102,3 +102,26 @@ class FollowUpSerializer(serializers.ModelSerializer):
 
 class CompleteFollowUpSerializer(serializers.Serializer):
     note = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    is_read = serializers.BooleanField(read_only=True)
+    lead_title = serializers.CharField(source="lead.title", read_only=True)
+
+    class Meta:
+        model = Notification
+        fields = [
+            "id",
+            "user",
+            "dedupe_key",
+            "notification_type",
+            "lead",
+            "lead_title",
+            "follow_up",
+            "title",
+            "message",
+            "is_read",
+            "read_at",
+            "created_at",
+        ]
+        read_only_fields = fields

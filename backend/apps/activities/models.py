@@ -127,6 +127,7 @@ class FollowUp(models.Model):
         blank=True,
         related_name="completed_follow_ups",
     )
+    reminder_sent_at = models.DateTimeField(null=True, blank=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -146,3 +147,63 @@ class FollowUp(models.Model):
     def is_overdue(self) -> bool:
         """Dynamically computed overdue flag."""
         return self.status == FollowUpStatus.PENDING and self.scheduled_at < timezone.now()
+
+
+class NotificationType(models.TextChoices):
+    OVERDUE_FOLLOW_UP = "overdue_follow_up", "Overdue Follow-up"
+    DAILY_SUMMARY = "daily_summary", "Daily Summary"
+    STALE_LEAD = "stale_lead", "Stale Lead"
+    SYSTEM = "system", "System"
+
+
+class Notification(models.Model):
+    """In-app notification entity with guaranteed dedupe key idempotency."""
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="notifications",
+    )
+    dedupe_key = models.CharField(max_length=255, db_index=True)
+    notification_type = models.CharField(
+        max_length=32,
+        choices=NotificationType.choices,
+        db_index=True,
+    )
+    lead = models.ForeignKey(
+        "leads.Lead",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="notifications",
+    )
+    follow_up = models.ForeignKey(
+        FollowUp,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="notifications",
+    )
+    title = models.CharField(max_length=255)
+    message = models.TextField()
+    read_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "dedupe_key"],
+                name="unique_user_dedupe_key",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["user", "read_at", "created_at"]),
+        ]
+
+    def __str__(self):
+        return f"Notification #{self.id} ({self.notification_type}) for {self.user.username}"
+
+    @property
+    def is_read(self) -> bool:
+        return bool(self.read_at)

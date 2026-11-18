@@ -4,7 +4,14 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 
-from apps.activities.models import Activity, ActivityType, FollowUp, FollowUpStatus, ReminderType
+from apps.activities.models import (
+    Activity,
+    ActivityType,
+    FollowUp,
+    FollowUpStatus,
+    Notification,
+    ReminderType,
+)
 from apps.leads.models import Lead
 
 
@@ -103,3 +110,80 @@ class FollowUpService:
         follow_up.status = FollowUpStatus.CANCELLED
         follow_up.save(update_fields=["status", "updated_at"])
         return follow_up
+
+    @staticmethod
+    @transaction.atomic
+    def reschedule_follow_up(
+        *, follow_up_id: int, new_scheduled_at: datetime, user=None, note: str = ""
+    ) -> FollowUp:
+        """Reschedule a follow-up, resetting reminder_sent_at so it can notify again."""
+        follow_up = FollowUp.objects.select_for_update().get(pk=follow_up_id)
+        follow_up.scheduled_at = new_scheduled_at
+        follow_up.reminder_sent_at = None  # Reset reminder flag
+        if follow_up.status == FollowUpStatus.COMPLETED:
+            follow_up.status = FollowUpStatus.PENDING
+
+        if note:
+            follow_up.note = (
+                f"{follow_up.note}\nRescheduled: {note} to {new_scheduled_at.isoformat()}".strip()
+            )
+
+        follow_up.save(
+            update_fields=["scheduled_at", "reminder_sent_at", "status", "note", "updated_at"]
+        )
+        return follow_up
+
+
+class NotificationService:
+    """Service handling in-app and email notifications with dedupe key claim."""
+
+    @staticmethod
+    @transaction.atomic
+    def create_notification(
+        *,
+        user,
+        dedupe_key: str,
+        notification_type: str,
+        title: str,
+        message: str,
+        lead=None,
+        follow_up=None,
+    ) -> tuple[Notification, bool]:
+        """
+        Atomically create notification claiming dedupe_key.
+        Triggers email send task via transaction.on_commit only if newly created.
+        """
+        notif, created = Notification.objects.get_or_create(
+            user=user,
+            dedupe_key=dedupe_key,
+            defaults={
+                "notification_type": notification_type,
+                "title": title.strip(),
+                "message": message.strip(),
+                "lead": lead,
+                "follow_up": follow_up,
+            },
+        )
+
+        if created:
+            from apps.activities.tasks import send_notification_email_task
+
+            transaction.on_commit(lambda: send_notification_email_task.delay(notif.id))
+
+        return notif, created
+
+    @staticmethod
+    @transaction.atomic
+    def mark_read(notification_id: int, user) -> Notification:
+        notif = Notification.objects.select_for_update().get(pk=notification_id, user=user)
+        if not notif.read_at:
+            notif.read_at = timezone.now()
+            notif.save(update_fields=["read_at"])
+        return notif
+
+    @staticmethod
+    @transaction.atomic
+    def mark_all_read(user) -> int:
+        return Notification.objects.filter(user=user, read_at__isnull=True).update(
+            read_at=timezone.now()
+        )
