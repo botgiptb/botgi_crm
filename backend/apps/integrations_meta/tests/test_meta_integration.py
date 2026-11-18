@@ -280,6 +280,46 @@ class TestMetaWebhookHandshakeAndSecurity:
             )
             assert resp_victim.status_code == status.HTTP_403_FORBIDDEN
 
+    def test_get_client_ip_scenarios(self):
+        """Test get_client_ip for 0 proxies, missing header, and proxy count exceeding entries."""
+        from django.test import RequestFactory
+
+        from apps.integrations_meta.services import MetaSecurityService
+
+        factory = RequestFactory()
+
+        # 1. NUM_PROXIES = 0 -> always returns REMOTE_ADDR, ignores X-Forwarded-For
+        with override_settings(NUM_PROXIES=0):
+            req = factory.get(
+                "/",
+                HTTP_X_FORWARDED_FOR="1.1.1.1, 2.2.2.2",
+                REMOTE_ADDR="192.168.1.100",
+            )
+            assert MetaSecurityService.get_client_ip(req) == "192.168.1.100"
+
+        # 2. Missing HTTP_X_FORWARDED_FOR -> returns REMOTE_ADDR
+        with override_settings(NUM_PROXIES=1):
+            req = factory.get("/", REMOTE_ADDR="192.168.1.100")
+            assert MetaSecurityService.get_client_ip(req) == "192.168.1.100"
+
+        # 3. More proxies than entries (NUM_PROXIES=3 with only 2 entries) -> fallback to REMOTE_ADDR
+        with override_settings(NUM_PROXIES=3):
+            req = factory.get(
+                "/",
+                HTTP_X_FORWARDED_FOR="1.1.1.1, 2.2.2.2",
+                REMOTE_ADDR="192.168.1.100",
+            )
+            assert MetaSecurityService.get_client_ip(req) == "192.168.1.100"
+
+        # 4. Standard proxy setup (NUM_PROXIES=1 with 2 entries) -> returns client IP (ips[-1])
+        with override_settings(NUM_PROXIES=1):
+            req = factory.get(
+                "/",
+                HTTP_X_FORWARDED_FOR="1.1.1.1, 2.2.2.2",
+                REMOTE_ADDR="192.168.1.100",
+            )
+            assert MetaSecurityService.get_client_ip(req) == "2.2.2.2"
+
 
 @pytest.mark.django_db(transaction=True)
 class TestMetaLeadIngestionAndProcessing:

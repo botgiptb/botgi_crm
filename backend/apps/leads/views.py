@@ -1,6 +1,9 @@
+import re
+
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import Q
-from rest_framework import status, viewsets
+from drf_spectacular.utils import extend_schema
+from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
@@ -16,6 +19,7 @@ from apps.leads.permissions import (
 )
 from apps.leads.serializers import (
     ChangeStageSerializer,
+    CheckPhoneRequestSerializer,
     CustomerSerializer,
     LeadAssignmentSerializer,
     LeadCreateSerializer,
@@ -30,6 +34,11 @@ from apps.leads.services import (
     CustomerService,
     LeadAssignmentService,
     LeadStageService,
+)
+from apps.leads.throttling import (
+    CheckPhoneIPThrottle,
+    CheckPhoneUserDailyThrottle,
+    CheckPhoneUserMinuteThrottle,
 )
 
 
@@ -54,16 +63,33 @@ class CustomerViewSet(viewsets.ModelViewSet):
         IsAssignedStaffOrManagerOrAdmin,
         IsManagerOrAdminForCustomerPhone,
     ]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ["name", "phone", "email", "company_name"]
+    ordering_fields = ["id", "name", "created_at", "total_spend"]
+    ordering = ["-id"]
 
     def get_queryset(self):
         user = self.request.user
         if getattr(user, "can_view_all_leads", False):
-            return Customer.objects.all().order_by("-id")
-        return (
-            Customer.objects.filter(Q(leads__assigned_to=user) | Q(leads__created_by=user))
-            .distinct()
-            .order_by("-id")
-        )
+            qs = Customer.objects.all()
+        else:
+            qs = Customer.objects.filter(
+                Q(leads__assigned_to=user) | Q(leads__created_by=user)
+            ).distinct()
+
+        # Phone search normalization: if search term has digits, match against normalized phone
+        search_term = self.request.query_params.get("search", "").strip()
+        if search_term:
+            clean_digits = re.sub(r"\D", "", search_term)
+            if len(clean_digits) >= 4:
+                qs = qs.filter(
+                    Q(phone__icontains=clean_digits)
+                    | Q(name__icontains=search_term)
+                    | Q(email__icontains=search_term)
+                    | Q(company_name__icontains=search_term)
+                )
+
+        return qs.order_by("-id")
 
     @action(detail=True, methods=["post"], permission_classes=[IsManagerOrAdmin])
     def merge(self, request, pk=None):
@@ -92,6 +118,10 @@ class LeadViewSet(viewsets.ModelViewSet):
     """
 
     permission_classes = [IsAuthenticated, IsAssignedStaffOrManagerOrAdmin]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ["customer__name", "customer__phone", "title", "notes"]
+    ordering_fields = ["id", "created_at", "last_activity_at", "deal_value", "updated_at"]
+    ordering = ["-created_at"]
 
     def get_serializer_class(self):
         if self.action == "create":
@@ -100,14 +130,57 @@ class LeadViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        base_qs = (
-            Lead.objects.select_related("customer", "stage", "assigned_to", "created_by")
-            .filter(is_active=True)
-            .order_by("-created_at")
-        )
+        qs = Lead.objects.select_related("customer", "stage", "assigned_to", "created_by")
+
+        # Staff scoping: staff are ALWAYS forced to their assigned active leads only
         if getattr(user, "can_view_all_leads", False):
-            return base_qs
-        return base_qs.filter(assigned_to=user)
+            assigned_to_param = self.request.query_params.get("assigned_to")
+            if assigned_to_param:
+                if assigned_to_param == "unassigned":
+                    qs = qs.filter(assigned_to__isnull=True)
+                elif assigned_to_param.isdigit():
+                    qs = qs.filter(assigned_to_id=int(assigned_to_param))
+
+            is_active_param = self.request.query_params.get("is_active")
+            if is_active_param is not None:
+                qs = qs.filter(is_active=is_active_param.lower() in ("true", "1"))
+            else:
+                qs = qs.filter(is_active=True)
+        else:
+            # Staff are strictly forced to their own active leads even if assigned_to is passed
+            qs = qs.filter(assigned_to=user, is_active=True)
+
+        # Stage filter
+        stage_param = self.request.query_params.get("stage")
+        if stage_param:
+            if stage_param.isdigit():
+                qs = qs.filter(stage_id=int(stage_param))
+            else:
+                qs = qs.filter(stage__slug=stage_param)
+
+        # Source filter
+        source_param = self.request.query_params.get("source")
+        if source_param:
+            qs = qs.filter(source=source_param)
+
+        # Product category filter
+        cat_param = self.request.query_params.get("product_category")
+        if cat_param:
+            qs = qs.filter(product_category=cat_param)
+
+        # Phone search normalization
+        search_term = self.request.query_params.get("search", "").strip()
+        if search_term:
+            clean_digits = re.sub(r"\D", "", search_term)
+            if len(clean_digits) >= 4:
+                qs = qs.filter(
+                    Q(customer__phone__icontains=clean_digits)
+                    | Q(customer__name__icontains=search_term)
+                    | Q(title__icontains=search_term)
+                    | Q(notes__icontains=search_term)
+                )
+
+        return qs.order_by("-created_at")
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data, context={"request": request})
@@ -264,6 +337,106 @@ class LeadViewSet(viewsets.ModelViewSet):
             return Response(FollowUpSerializer(follow_up).data, status=status.HTTP_201_CREATED)
         except DjangoValidationError as exc:
             raise ValidationError(exc.message_dict if hasattr(exc, "message_dict") else str(exc))
+
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path="check-phone",
+        permission_classes=[IsAuthenticated],
+        throttle_classes=[
+            CheckPhoneUserMinuteThrottle,
+            CheckPhoneUserDailyThrottle,
+            CheckPhoneIPThrottle,
+        ],
+    )
+    @extend_schema(
+        request=CheckPhoneRequestSerializer,
+        summary="Check customer phone number for duplicate records and open leads",
+    )
+    def check_phone(self, request):
+        """
+        Check if a phone number belongs to an existing customer and return open leads.
+        Staff get limited information only (customer id/name, open lead stages & assignees).
+        Managers/admins get full customer details including spend and contact data.
+        Throttled per user (20/min, 200/day) and per IP (30/min).
+        """
+        phone = request.data.get("phone", "")
+        if not phone or not str(phone).strip():
+            raise ValidationError({"phone": "Phone number is required."})
+
+        try:
+            cleaned_phone = CustomerService.clean_phone(phone)
+        except DjangoValidationError as exc:
+            raise ValidationError(
+                {"phone": exc.message_dict if hasattr(exc, "message_dict") else str(exc)}
+            )
+
+        customer = Customer.objects.filter(phone=cleaned_phone).first()
+        if not customer:
+            return Response({"exists": False, "customer": None, "open_leads": []})
+
+        open_leads = (
+            Lead.objects.filter(
+                customer=customer,
+                is_active=True,
+                stage__is_won=False,
+                stage__is_lost=False,
+            )
+            .select_related("stage", "assigned_to")
+            .order_by("-created_at")
+        )
+
+        if getattr(request.user, "can_view_all_leads", False):
+            return Response(
+                {
+                    "exists": True,
+                    "customer": {
+                        "id": customer.id,
+                        "name": customer.name,
+                        "phone": customer.phone,
+                        "email": customer.email,
+                        "total_spend": str(customer.total_spend),
+                        "created_at": customer.created_at.isoformat(),
+                    },
+                    "open_leads": [
+                        {
+                            "id": lead.id,
+                            "title": lead.title,
+                            "stage_id": lead.stage_id,
+                            "stage_name": lead.stage.name,
+                            "assigned_to_id": lead.assigned_to_id,
+                            "assigned_to_name": (
+                                lead.assigned_to.username if lead.assigned_to else "Unassigned"
+                            ),
+                            "is_assigned_to_me": lead.assigned_to_id == request.user.id,
+                            "deal_value": str(lead.deal_value) if lead.deal_value else None,
+                            "created_at": lead.created_at.isoformat(),
+                        }
+                        for lead in open_leads
+                    ],
+                }
+            )
+
+        return Response(
+            {
+                "exists": True,
+                "customer": {
+                    "id": customer.id,
+                    "name": customer.name,
+                },
+                "open_leads": [
+                    {
+                        "id": lead.id,
+                        "stage_name": lead.stage.name,
+                        "assigned_to_name": (
+                            lead.assigned_to.username if lead.assigned_to else "Unassigned"
+                        ),
+                        "is_assigned_to_me": lead.assigned_to_id == request.user.id,
+                    }
+                    for lead in open_leads
+                ],
+            }
+        )
 
 
 class UnprocessedMetaLeadViewSet(viewsets.ModelViewSet):

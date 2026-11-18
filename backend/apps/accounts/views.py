@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -27,10 +28,16 @@ class CurrentUserProfileView(APIView):
 
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(responses={200: UserSerializer}, summary="Get current logged-in user profile")
     def get(self, request):
         serializer = UserSerializer(request.user)
         return Response(serializer.data)
 
+    @extend_schema(
+        request=UserUpdateSerializer,
+        responses={200: UserSerializer},
+        summary="Update current logged-in user profile",
+    )
     def patch(self, request):
         allowed_fields = {"first_name", "last_name", "phone"}
         update_data = {k: v for k, v in request.data.items() if k in allowed_fields}

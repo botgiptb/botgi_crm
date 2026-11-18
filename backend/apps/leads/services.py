@@ -39,6 +39,8 @@ def normalize_phone_number(raw_phone: str, default_region: str = "IN") -> str:
 class CustomerService:
     """Handles customer lookup, creation, phone normalization, updates, and merges."""
 
+    clean_phone = staticmethod(normalize_phone_number)
+
     @staticmethod
     @transaction.atomic
     def get_or_create_customer(
@@ -156,8 +158,17 @@ class LeadService:
     ) -> dict[str, Any]:
         raw_phone = customer_data.get("phone", "")
 
-        # Meta webhook handling when phone is missing
+        # Reject manual creation of Meta Lead Ads leads
         source = lead_data.get("source", LeadSource.WALK_IN)
+        if (
+            user is not None
+            and source == LeadSource.META_LEAD_ADS
+            and not lead_data.get("meta_lead_id")
+        ):
+            raise ValidationError(
+                {"source": "Manual creation of Meta Lead Ads leads is not allowed."}
+            )
+
         if not raw_phone or not str(raw_phone).strip():
             if source == LeadSource.META_LEAD_ADS:
                 unprocessed = UnprocessedMetaLead.objects.create(

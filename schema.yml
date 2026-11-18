@@ -1,0 +1,3262 @@
+openapi: 3.0.3
+info:
+  title: Shop CRM API
+  version: 1.0.0
+  description: Sales Lead Management System for Computer Shop
+paths:
+  /api/activities/:
+    get:
+      operationId: activities_list
+      description: |-
+        Activity interaction viewset scoped through lead assignee.
+        Staff see only activities for leads assigned to them.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - activities
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedActivityList'
+          description: ''
+    post:
+      operationId: activities_create
+      description: |-
+        Activity interaction viewset scoped through lead assignee.
+        Staff see only activities for leads assigned to them.
+      tags:
+      - activities
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Activity'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Activity'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Activity'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Activity'
+          description: ''
+  /api/activities/{id}/:
+    get:
+      operationId: activities_retrieve
+      description: |-
+        Activity interaction viewset scoped through lead assignee.
+        Staff see only activities for leads assigned to them.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - activities
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Activity'
+          description: ''
+    put:
+      operationId: activities_update
+      description: |-
+        Activity interaction viewset scoped through lead assignee.
+        Staff see only activities for leads assigned to them.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - activities
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Activity'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Activity'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Activity'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Activity'
+          description: ''
+    patch:
+      operationId: activities_partial_update
+      description: |-
+        Activity interaction viewset scoped through lead assignee.
+        Staff see only activities for leads assigned to them.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - activities
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedActivity'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedActivity'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedActivity'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Activity'
+          description: ''
+    delete:
+      operationId: activities_destroy
+      description: |-
+        Activity interaction viewset scoped through lead assignee.
+        Staff see only activities for leads assigned to them.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - activities
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/auth/login/:
+    post:
+      operationId: auth_login_create
+      description: |-
+        Authenticate user credentials, return in-memory access token,
+        and set the rotated refresh token in an httpOnly cookie.
+        Throttles failed login attempts per IP and per username.
+        Enforces origin verification against ALLOWED_ORIGINS.
+      summary: Login and obtain in-memory access token with httpOnly refresh cookie
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+        required: true
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+          description: ''
+  /api/auth/logout/:
+    post:
+      operationId: auth_logout_create
+      description: |-
+        Log out: blacklists the refresh token in database (even if access token is expired),
+        clears httpOnly cookie, and returns 200 OK. Idempotent.
+        Enforces origin verification against ALLOWED_ORIGINS.
+      summary: Logout by blacklisting refresh token and clearing cookie
+      tags:
+      - auth
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogoutResponse'
+          description: ''
+  /api/auth/me/:
+    get:
+      operationId: auth_me_retrieve
+      description: View and update current logged-in user profile.
+      summary: Get current logged-in user profile
+      tags:
+      - auth
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+    patch:
+      operationId: auth_me_partial_update
+      description: View and update current logged-in user profile.
+      summary: Update current logged-in user profile
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUserUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUserUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUserUpdate'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+  /api/auth/refresh/:
+    post:
+      operationId: auth_refresh_create
+      description: |-
+        Silent token refresh: reads refresh token from httpOnly cookie,
+        verifies user is active, rotates refresh token, and returns a new access token.
+        Enforces origin verification against ALLOWED_ORIGINS.
+      summary: Rotate refresh token cookie and obtain fresh access token
+      tags:
+      - auth
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+          description: ''
+  /api/auth/token/:
+    post:
+      operationId: auth_token_create
+      description: Obtain JWT tokens with user profile information.
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomTokenObtainPair'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CustomTokenObtainPair'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CustomTokenObtainPair'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomTokenObtainPair'
+          description: ''
+  /api/auth/token/refresh/:
+    post:
+      operationId: auth_token_refresh_create
+      description: |-
+        Takes a refresh type JSON web token and returns an access type JSON web
+        token if the refresh token is valid.
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRefresh'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenRefresh'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenRefresh'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenRefresh'
+          description: ''
+  /api/customers/:
+    get:
+      operationId: customers_list
+      description: |-
+        Customer master viewset.
+        Staff see only customers associated with their assigned/created leads.
+        Managers/Admins see all customers.
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - customers
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedCustomerList'
+          description: ''
+    post:
+      operationId: customers_create
+      description: |-
+        Customer master viewset.
+        Staff see only customers associated with their assigned/created leads.
+        Managers/Admins see all customers.
+      tags:
+      - customers
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Customer'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Customer'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Customer'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+          description: ''
+  /api/customers/{id}/:
+    get:
+      operationId: customers_retrieve
+      description: |-
+        Customer master viewset.
+        Staff see only customers associated with their assigned/created leads.
+        Managers/Admins see all customers.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - customers
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+          description: ''
+    put:
+      operationId: customers_update
+      description: |-
+        Customer master viewset.
+        Staff see only customers associated with their assigned/created leads.
+        Managers/Admins see all customers.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - customers
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Customer'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Customer'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Customer'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+          description: ''
+    patch:
+      operationId: customers_partial_update
+      description: |-
+        Customer master viewset.
+        Staff see only customers associated with their assigned/created leads.
+        Managers/Admins see all customers.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - customers
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedCustomer'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedCustomer'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedCustomer'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+          description: ''
+    delete:
+      operationId: customers_destroy
+      description: |-
+        Customer master viewset.
+        Staff see only customers associated with their assigned/created leads.
+        Managers/Admins see all customers.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - customers
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/customers/{id}/merge/:
+    post:
+      operationId: customers_merge_create
+      description: Merge this customer into another target customer.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - customers
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Customer'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Customer'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Customer'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+          description: ''
+  /api/follow-ups/:
+    get:
+      operationId: follow_ups_list
+      description: Follow-up reminders viewset scoped through lead assignee.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - follow-ups
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedFollowUpList'
+          description: ''
+    post:
+      operationId: follow_ups_create
+      description: Follow-up reminders viewset scoped through lead assignee.
+      tags:
+      - follow-ups
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FollowUp'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/FollowUp'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/FollowUp'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FollowUp'
+          description: ''
+  /api/follow-ups/{id}/:
+    get:
+      operationId: follow_ups_retrieve
+      description: Follow-up reminders viewset scoped through lead assignee.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - follow-ups
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FollowUp'
+          description: ''
+    put:
+      operationId: follow_ups_update
+      description: Follow-up reminders viewset scoped through lead assignee.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - follow-ups
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FollowUp'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/FollowUp'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/FollowUp'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FollowUp'
+          description: ''
+    patch:
+      operationId: follow_ups_partial_update
+      description: Follow-up reminders viewset scoped through lead assignee.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - follow-ups
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedFollowUp'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedFollowUp'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedFollowUp'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FollowUp'
+          description: ''
+    delete:
+      operationId: follow_ups_destroy
+      description: Follow-up reminders viewset scoped through lead assignee.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - follow-ups
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/follow-ups/{id}/cancel/:
+    post:
+      operationId: follow_ups_cancel_create
+      description: Cancel follow-up reminder.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - follow-ups
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FollowUp'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/FollowUp'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/FollowUp'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FollowUp'
+          description: ''
+  /api/follow-ups/{id}/complete/:
+    post:
+      operationId: follow_ups_complete_create
+      description: Mark follow-up as completed.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - follow-ups
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FollowUp'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/FollowUp'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/FollowUp'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FollowUp'
+          description: ''
+  /api/follow-ups/overdue/:
+    get:
+      operationId: follow_ups_overdue_retrieve
+      description: List overdue pending follow-ups for current user/system.
+      tags:
+      - follow-ups
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FollowUp'
+          description: ''
+  /api/integrations/meta/logs/:
+    get:
+      operationId: integrations_meta_logs_list
+      description: Manager/Admin-only audit endpoints for Meta webhook delivery logs.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - integrations
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMetaWebhookLogList'
+          description: ''
+  /api/integrations/meta/logs/{id}/:
+    get:
+      operationId: integrations_meta_logs_retrieve
+      description: Manager/Admin-only audit endpoints for Meta webhook delivery logs.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this meta webhook log.
+        required: true
+      tags:
+      - integrations
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetaWebhookLog'
+          description: ''
+  /api/integrations/meta/logs/{id}/retry/:
+    post:
+      operationId: integrations_meta_logs_retry_create
+      description: Manually re-queue a webhook log for processing.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this meta webhook log.
+        required: true
+      tags:
+      - integrations
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MetaWebhookLog'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MetaWebhookLog'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MetaWebhookLog'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetaWebhookLog'
+          description: ''
+  /api/leads/:
+    get:
+      operationId: leads_list
+      description: |-
+        Lead lifecycle and pipeline management.
+        Staff see and edit only their assigned leads.
+        Managers/Admins see all leads (including unassigned and Meta leads).
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - leads
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedLeadList'
+          description: ''
+    post:
+      operationId: leads_create
+      description: |-
+        Lead lifecycle and pipeline management.
+        Staff see and edit only their assigned leads.
+        Managers/Admins see all leads (including unassigned and Meta leads).
+      tags:
+      - leads
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LeadCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/LeadCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/LeadCreate'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LeadCreate'
+          description: ''
+  /api/leads/{id}/:
+    get:
+      operationId: leads_retrieve
+      description: |-
+        Lead lifecycle and pipeline management.
+        Staff see and edit only their assigned leads.
+        Managers/Admins see all leads (including unassigned and Meta leads).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - leads
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lead'
+          description: ''
+    put:
+      operationId: leads_update
+      description: |-
+        Lead lifecycle and pipeline management.
+        Staff see and edit only their assigned leads.
+        Managers/Admins see all leads (including unassigned and Meta leads).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - leads
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Lead'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Lead'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Lead'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lead'
+          description: ''
+    patch:
+      operationId: leads_partial_update
+      description: |-
+        Lead lifecycle and pipeline management.
+        Staff see and edit only their assigned leads.
+        Managers/Admins see all leads (including unassigned and Meta leads).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - leads
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedLead'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedLead'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedLead'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lead'
+          description: ''
+    delete:
+      operationId: leads_destroy
+      description: |-
+        Lead lifecycle and pipeline management.
+        Staff see and edit only their assigned leads.
+        Managers/Admins see all leads (including unassigned and Meta leads).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - leads
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/leads/{id}/activities/:
+    get:
+      operationId: leads_activities_retrieve
+      description: List or log activities for this lead.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - leads
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lead'
+          description: ''
+    post:
+      operationId: leads_activities_create
+      description: List or log activities for this lead.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - leads
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Lead'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Lead'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Lead'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lead'
+          description: ''
+  /api/leads/{id}/assignments/:
+    get:
+      operationId: leads_assignments_retrieve
+      description: View assignment and reassignment audit history for this lead.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - leads
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lead'
+          description: ''
+  /api/leads/{id}/change_stage/:
+    post:
+      operationId: leads_change_stage_create
+      description: Atomically advance or transition lead stage.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - leads
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Lead'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Lead'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Lead'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lead'
+          description: ''
+  /api/leads/{id}/follow_ups/:
+    get:
+      operationId: leads_follow_ups_retrieve
+      description: List or schedule follow-up reminders for this lead.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - leads
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lead'
+          description: ''
+    post:
+      operationId: leads_follow_ups_create
+      description: List or schedule follow-up reminders for this lead.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - leads
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Lead'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Lead'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Lead'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lead'
+          description: ''
+  /api/leads/{id}/reassign/:
+    post:
+      operationId: leads_reassign_create
+      description: Reassign lead to another user and transfer pending follow-ups (Manager/Admin
+        only).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - leads
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Lead'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Lead'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Lead'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lead'
+          description: ''
+  /api/leads/{id}/stage_history/:
+    get:
+      operationId: leads_stage_history_retrieve
+      description: View stage transition audit history for this lead.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - leads
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lead'
+          description: ''
+  /api/leads/{id}/update_deal_value/:
+    post:
+      operationId: leads_update_deal_value_create
+      description: Update deal_value on a Won lead (Manager/Admin only).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - leads
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Lead'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Lead'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Lead'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lead'
+          description: ''
+  /api/leads/check-phone/:
+    post:
+      operationId: leads_check_phone_create
+      description: |-
+        Check if a phone number belongs to an existing customer and return open leads.
+        Staff get limited information only (customer id/name, open lead stages & assignees).
+        Managers/admins get full customer details including spend and contact data.
+        Throttled per user (20/min, 200/day) and per IP (30/min).
+      tags:
+      - leads
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Lead'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Lead'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Lead'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lead'
+          description: ''
+  /api/meta-unprocessed/:
+    get:
+      operationId: meta_unprocessed_list
+      description: View and resolve Meta lead payloads missing phone numbers (Manager/Admin
+        only).
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - meta-unprocessed
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedUnprocessedMetaLeadList'
+          description: ''
+    post:
+      operationId: meta_unprocessed_create
+      description: View and resolve Meta lead payloads missing phone numbers (Manager/Admin
+        only).
+      tags:
+      - meta-unprocessed
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UnprocessedMetaLead'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UnprocessedMetaLead'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UnprocessedMetaLead'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnprocessedMetaLead'
+          description: ''
+  /api/meta-unprocessed/{id}/:
+    get:
+      operationId: meta_unprocessed_retrieve
+      description: View and resolve Meta lead payloads missing phone numbers (Manager/Admin
+        only).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this unprocessed meta lead.
+        required: true
+      tags:
+      - meta-unprocessed
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnprocessedMetaLead'
+          description: ''
+    put:
+      operationId: meta_unprocessed_update
+      description: View and resolve Meta lead payloads missing phone numbers (Manager/Admin
+        only).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this unprocessed meta lead.
+        required: true
+      tags:
+      - meta-unprocessed
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UnprocessedMetaLead'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UnprocessedMetaLead'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UnprocessedMetaLead'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnprocessedMetaLead'
+          description: ''
+    patch:
+      operationId: meta_unprocessed_partial_update
+      description: View and resolve Meta lead payloads missing phone numbers (Manager/Admin
+        only).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this unprocessed meta lead.
+        required: true
+      tags:
+      - meta-unprocessed
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUnprocessedMetaLead'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUnprocessedMetaLead'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUnprocessedMetaLead'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnprocessedMetaLead'
+          description: ''
+    delete:
+      operationId: meta_unprocessed_destroy
+      description: View and resolve Meta lead payloads missing phone numbers (Manager/Admin
+        only).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this unprocessed meta lead.
+        required: true
+      tags:
+      - meta-unprocessed
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/meta-unprocessed/{id}/resolve/:
+    post:
+      operationId: meta_unprocessed_resolve_create
+      description: Manager resolves an unprocessed lead by supplying a valid phone
+        number.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this unprocessed meta lead.
+        required: true
+      tags:
+      - meta-unprocessed
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UnprocessedMetaLead'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UnprocessedMetaLead'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UnprocessedMetaLead'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnprocessedMetaLead'
+          description: ''
+  /api/notifications/:
+    get:
+      operationId: notifications_list
+      description: |-
+        User in-app notifications.
+        Strictly scoped to the authenticated user. Requests for other users' notifications return 404.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - notifications
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedNotificationList'
+          description: ''
+  /api/notifications/{id}/:
+    get:
+      operationId: notifications_retrieve
+      description: |-
+        User in-app notifications.
+        Strictly scoped to the authenticated user. Requests for other users' notifications return 404.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - notifications
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+          description: ''
+  /api/notifications/{id}/mark_read/:
+    post:
+      operationId: notifications_mark_read_create
+      description: Mark single notification as read (returns 404 if not owned by request.user).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - notifications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Notification'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Notification'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Notification'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+          description: ''
+  /api/notifications/mark_all_read/:
+    post:
+      operationId: notifications_mark_all_read_create
+      description: Mark all unread notifications as read for current user.
+      tags:
+      - notifications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Notification'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Notification'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Notification'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+          description: ''
+  /api/notifications/unread_count/:
+    get:
+      operationId: notifications_unread_count_retrieve
+      description: Return the count of unread notifications for badge.
+      tags:
+      - notifications
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+          description: ''
+  /api/stages/:
+    get:
+      operationId: stages_list
+      description: List and retrieve pipeline stages in order.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - stages
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedStageList'
+          description: ''
+  /api/stages/{id}/:
+    get:
+      operationId: stages_retrieve
+      description: List and retrieve pipeline stages in order.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this stage.
+        required: true
+      tags:
+      - stages
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Stage'
+          description: ''
+  /api/users/:
+    get:
+      operationId: users_list
+      description: Manage team members and roles.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - users
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedUserList'
+          description: ''
+    post:
+      operationId: users_create
+      description: Manage team members and roles.
+      tags:
+      - users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserCreate'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserCreate'
+          description: ''
+  /api/users/{id}/:
+    get:
+      operationId: users_retrieve
+      description: Manage team members and roles.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this User.
+        required: true
+      tags:
+      - users
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+    put:
+      operationId: users_update
+      description: Manage team members and roles.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this User.
+        required: true
+      tags:
+      - users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserUpdate'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserUpdate'
+          description: ''
+    patch:
+      operationId: users_partial_update
+      description: Manage team members and roles.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this User.
+        required: true
+      tags:
+      - users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUserUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUserUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUserUpdate'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserUpdate'
+          description: ''
+    delete:
+      operationId: users_destroy
+      description: Manage team members and roles.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this User.
+        required: true
+      tags:
+      - users
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/users/assignable/:
+    get:
+      operationId: users_assignable_retrieve
+      description: List active users available for lead assignment.
+      tags:
+      - users
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+components:
+  schemas:
+    Activity:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        lead:
+          type: integer
+        user:
+          type: integer
+          readOnly: true
+          nullable: true
+        user_name:
+          type: string
+          readOnly: true
+        activity_type:
+          $ref: '#/components/schemas/ActivityTypeEnum'
+        is_outbound:
+          type: boolean
+          readOnly: true
+        title:
+          type: string
+          maxLength: 200
+        notes:
+          type: string
+        occurred_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - activity_type
+      - created_at
+      - id
+      - is_outbound
+      - lead
+      - user
+      - user_name
+    ActivityTypeEnum:
+      enum:
+      - call
+      - whatsapp
+      - note
+      - visit_walk_in
+      - email
+      - quotation_sent
+      - system
+      type: string
+      description: |-
+        * `call` - Phone Call
+        * `whatsapp` - WhatsApp Message
+        * `note` - Internal Note
+        * `visit_walk_in` - In-Store Visit
+        * `email` - Email
+        * `quotation_sent` - Quotation Sent
+        * `system` - System Event
+    AuthResponse:
+      type: object
+      properties:
+        access:
+          type: string
+          description: Short-lived in-memory JWT access token
+        user:
+          $ref: '#/components/schemas/User'
+      required:
+      - access
+      - user
+    BlankEnum:
+      enum:
+      - ''
+    CustomTokenObtainPair:
+      type: object
+      description: Custom SimpleJWT serializer providing user details and role claims.
+      properties:
+        username:
+          type: string
+          writeOnly: true
+        password:
+          type: string
+          writeOnly: true
+      required:
+      - password
+      - username
+    Customer:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 150
+        phone:
+          type: string
+          maxLength: 32
+        alt_phone:
+          type: string
+          maxLength: 32
+        email:
+          oneOf:
+          - type: string
+            format: email
+            maxLength: 254
+          - type: string
+            maxLength: 0
+        address:
+          type: string
+        customer_type:
+          $ref: '#/components/schemas/CustomerTypeEnum'
+        company_name:
+          type: string
+          maxLength: 150
+        gstin:
+          type: string
+          maxLength: 20
+        notes:
+          type: string
+        is_active:
+          type: boolean
+        total_spend:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          readOnly: true
+        last_purchase_at:
+          type: string
+          format: date-time
+          readOnly: true
+        open_leads_count:
+          type: integer
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - last_purchase_at
+      - name
+      - open_leads_count
+      - phone
+      - total_spend
+      - updated_at
+    CustomerTypeEnum:
+      enum:
+      - individual
+      - business
+      type: string
+      description: |-
+        * `individual` - Individual
+        * `business` - Business
+    FollowUp:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        lead:
+          type: integer
+        assigned_to:
+          type: integer
+          readOnly: true
+          nullable: true
+        assigned_to_name:
+          type: string
+          readOnly: true
+        scheduled_at:
+          type: string
+          format: date-time
+        status:
+          allOf:
+          - $ref: '#/components/schemas/FollowUpStatusEnum'
+          readOnly: true
+        reminder_type:
+          $ref: '#/components/schemas/ReminderTypeEnum'
+        note:
+          type: string
+        is_overdue:
+          type: boolean
+          readOnly: true
+        completed_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        completed_by:
+          type: integer
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - assigned_to
+      - assigned_to_name
+      - completed_at
+      - completed_by
+      - created_at
+      - id
+      - is_overdue
+      - lead
+      - scheduled_at
+      - status
+      - updated_at
+    FollowUpStatusEnum:
+      enum:
+      - pending
+      - completed
+      - cancelled
+      type: string
+      description: |-
+        * `pending` - Pending
+        * `completed` - Completed
+        * `cancelled` - Cancelled
+    Lead:
+      type: object
+      description: Lead representation exposing customer contact info read-only.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        customer:
+          type: integer
+          readOnly: true
+        customer_name:
+          type: string
+          readOnly: true
+        customer_phone:
+          type: string
+          readOnly: true
+        customer_email:
+          type: string
+          readOnly: true
+        title:
+          type: string
+          maxLength: 200
+        source:
+          $ref: '#/components/schemas/SourceEnum'
+        campaign_name:
+          type: string
+          maxLength: 255
+        ad_id:
+          type: string
+          maxLength: 100
+        form_id:
+          type: string
+          maxLength: 100
+        meta_lead_id:
+          type: string
+          nullable: true
+          maxLength: 100
+        raw_meta_data: {}
+        product_category:
+          oneOf:
+          - $ref: '#/components/schemas/ProductCategoryEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        product_brand:
+          type: string
+          maxLength: 100
+        budget_min:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          nullable: true
+        budget_max:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          nullable: true
+        stage:
+          type: integer
+          readOnly: true
+        stage_name:
+          type: string
+          readOnly: true
+        stage_slug:
+          type: string
+          readOnly: true
+        deal_value:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          readOnly: true
+          nullable: true
+        lost_reason_category:
+          allOf:
+          - $ref: '#/components/schemas/LostReasonCategoryEnum'
+          readOnly: true
+        lost_reason_notes:
+          type: string
+          readOnly: true
+        assigned_to:
+          type: integer
+          readOnly: true
+          nullable: true
+        assigned_to_name:
+          type: string
+          readOnly: true
+        created_by:
+          type: integer
+          readOnly: true
+          nullable: true
+        first_contacted_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        last_activity_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        closed_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        notes:
+          type: string
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - assigned_to
+      - assigned_to_name
+      - closed_at
+      - created_at
+      - created_by
+      - customer
+      - customer_email
+      - customer_name
+      - customer_phone
+      - deal_value
+      - first_contacted_at
+      - id
+      - last_activity_at
+      - lost_reason_category
+      - lost_reason_notes
+      - stage
+      - stage_name
+      - stage_slug
+      - updated_at
+    LeadCreate:
+      type: object
+      description: Unified creation serializer handling Customer get_or_create and
+        duplicate warnings.
+      properties:
+        customer_name:
+          type: string
+          maxLength: 150
+        customer_phone:
+          type: string
+          maxLength: 32
+        customer_email:
+          oneOf:
+          - type: string
+            format: email
+            default: ''
+          - type: string
+            maxLength: 0
+        customer_alt_phone:
+          type: string
+          default: ''
+        customer_address:
+          type: string
+          default: ''
+        customer_type:
+          allOf:
+          - $ref: '#/components/schemas/CustomerTypeEnum'
+          default: individual
+        company_name:
+          type: string
+          default: ''
+        gstin:
+          type: string
+          default: ''
+        customer_notes:
+          type: string
+          default: ''
+        title:
+          type: string
+          default: ''
+          maxLength: 200
+        source:
+          allOf:
+          - $ref: '#/components/schemas/SourceEnum'
+          default: walk_in
+        campaign_name:
+          type: string
+          default: ''
+        ad_id:
+          type: string
+          default: ''
+        form_id:
+          type: string
+          default: ''
+        meta_lead_id:
+          type: string
+          default: ''
+        raw_meta_data: {}
+        product_category:
+          allOf:
+          - $ref: '#/components/schemas/ProductCategoryEnum'
+          default: other
+        product_brand:
+          type: string
+          default: ''
+        budget_min:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          nullable: true
+        budget_max:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          nullable: true
+        notes:
+          type: string
+          default: ''
+        assigned_to_id:
+          type: integer
+          nullable: true
+      required:
+      - customer_name
+      - customer_phone
+    LoginRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          description: Username or email
+        password:
+          type: string
+          writeOnly: true
+      required:
+      - password
+      - username
+    LogoutResponse:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+      - message
+    LostReasonCategoryEnum:
+      enum:
+      - price_high
+      - out_of_stock
+      - bought_elsewhere
+      - spec_unavailable
+      - no_response
+      - invalid_inquiry
+      - other
+      type: string
+      description: |-
+        * `price_high` - Price Too High
+        * `out_of_stock` - Product Out of Stock
+        * `bought_elsewhere` - Bought Elsewhere
+        * `spec_unavailable` - Required Specs Unavailable
+        * `no_response` - Customer Did Not Respond
+        * `invalid_inquiry` - Spam / Invalid Inquiry
+        * `other` - Other
+    MetaWebhookLog:
+      type: object
+      description: Read-only serializer for auditing Meta webhook logs.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        meta_lead_id:
+          type: string
+          readOnly: true
+        payload:
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/MetaWebhookLogStatusEnum'
+          readOnly: true
+        attempts:
+          type: integer
+          readOnly: true
+        error_message:
+          type: string
+          readOnly: true
+        lead:
+          type: integer
+          readOnly: true
+          nullable: true
+        unprocessed_lead:
+          type: integer
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        processed_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+      required:
+      - attempts
+      - created_at
+      - error_message
+      - id
+      - lead
+      - meta_lead_id
+      - payload
+      - processed_at
+      - status
+      - unprocessed_lead
+    MetaWebhookLogStatusEnum:
+      enum:
+      - received
+      - processed
+      - duplicate
+      - error
+      type: string
+      description: |-
+        * `received` - Received
+        * `processed` - Processed
+        * `duplicate` - Duplicate
+        * `error` - Error
+    Notification:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        user:
+          type: integer
+          readOnly: true
+        dedupe_key:
+          type: string
+          readOnly: true
+        notification_type:
+          allOf:
+          - $ref: '#/components/schemas/NotificationTypeEnum'
+          readOnly: true
+        lead:
+          type: integer
+          readOnly: true
+          nullable: true
+        lead_title:
+          type: string
+          readOnly: true
+        follow_up:
+          type: integer
+          readOnly: true
+          nullable: true
+        title:
+          type: string
+          readOnly: true
+        message:
+          type: string
+          readOnly: true
+        is_read:
+          type: boolean
+          readOnly: true
+        read_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - dedupe_key
+      - follow_up
+      - id
+      - is_read
+      - lead
+      - lead_title
+      - message
+      - notification_type
+      - read_at
+      - title
+      - user
+    NotificationTypeEnum:
+      enum:
+      - overdue_follow_up
+      - daily_summary
+      - stale_lead
+      - new_lead
+      - unprocessed_meta_lead
+      - meta_api_error
+      - system
+      type: string
+      description: |-
+        * `overdue_follow_up` - Overdue Follow-up
+        * `daily_summary` - Daily Summary
+        * `stale_lead` - Stale Lead
+        * `new_lead` - New Lead
+        * `unprocessed_meta_lead` - Unprocessed Meta Lead
+        * `meta_api_error` - Meta API Error
+        * `system` - System
+    PaginatedActivityList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Activity'
+    PaginatedCustomerList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Customer'
+    PaginatedFollowUpList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/FollowUp'
+    PaginatedLeadList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Lead'
+    PaginatedMetaWebhookLogList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/MetaWebhookLog'
+    PaginatedNotificationList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Notification'
+    PaginatedStageList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Stage'
+    PaginatedUnprocessedMetaLeadList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/UnprocessedMetaLead'
+    PaginatedUserList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+    PatchedActivity:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        lead:
+          type: integer
+        user:
+          type: integer
+          readOnly: true
+          nullable: true
+        user_name:
+          type: string
+          readOnly: true
+        activity_type:
+          $ref: '#/components/schemas/ActivityTypeEnum'
+        is_outbound:
+          type: boolean
+          readOnly: true
+        title:
+          type: string
+          maxLength: 200
+        notes:
+          type: string
+        occurred_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+    PatchedCustomer:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 150
+        phone:
+          type: string
+          maxLength: 32
+        alt_phone:
+          type: string
+          maxLength: 32
+        email:
+          oneOf:
+          - type: string
+            format: email
+            maxLength: 254
+          - type: string
+            maxLength: 0
+        address:
+          type: string
+        customer_type:
+          $ref: '#/components/schemas/CustomerTypeEnum'
+        company_name:
+          type: string
+          maxLength: 150
+        gstin:
+          type: string
+          maxLength: 20
+        notes:
+          type: string
+        is_active:
+          type: boolean
+        total_spend:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          readOnly: true
+        last_purchase_at:
+          type: string
+          format: date-time
+          readOnly: true
+        open_leads_count:
+          type: integer
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+    PatchedFollowUp:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        lead:
+          type: integer
+        assigned_to:
+          type: integer
+          readOnly: true
+          nullable: true
+        assigned_to_name:
+          type: string
+          readOnly: true
+        scheduled_at:
+          type: string
+          format: date-time
+        status:
+          allOf:
+          - $ref: '#/components/schemas/FollowUpStatusEnum'
+          readOnly: true
+        reminder_type:
+          $ref: '#/components/schemas/ReminderTypeEnum'
+        note:
+          type: string
+        is_overdue:
+          type: boolean
+          readOnly: true
+        completed_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        completed_by:
+          type: integer
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+    PatchedLead:
+      type: object
+      description: Lead representation exposing customer contact info read-only.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        customer:
+          type: integer
+          readOnly: true
+        customer_name:
+          type: string
+          readOnly: true
+        customer_phone:
+          type: string
+          readOnly: true
+        customer_email:
+          type: string
+          readOnly: true
+        title:
+          type: string
+          maxLength: 200
+        source:
+          $ref: '#/components/schemas/SourceEnum'
+        campaign_name:
+          type: string
+          maxLength: 255
+        ad_id:
+          type: string
+          maxLength: 100
+        form_id:
+          type: string
+          maxLength: 100
+        meta_lead_id:
+          type: string
+          nullable: true
+          maxLength: 100
+        raw_meta_data: {}
+        product_category:
+          oneOf:
+          - $ref: '#/components/schemas/ProductCategoryEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        product_brand:
+          type: string
+          maxLength: 100
+        budget_min:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          nullable: true
+        budget_max:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          nullable: true
+        stage:
+          type: integer
+          readOnly: true
+        stage_name:
+          type: string
+          readOnly: true
+        stage_slug:
+          type: string
+          readOnly: true
+        deal_value:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          readOnly: true
+          nullable: true
+        lost_reason_category:
+          allOf:
+          - $ref: '#/components/schemas/LostReasonCategoryEnum'
+          readOnly: true
+        lost_reason_notes:
+          type: string
+          readOnly: true
+        assigned_to:
+          type: integer
+          readOnly: true
+          nullable: true
+        assigned_to_name:
+          type: string
+          readOnly: true
+        created_by:
+          type: integer
+          readOnly: true
+          nullable: true
+        first_contacted_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        last_activity_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        closed_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        notes:
+          type: string
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+    PatchedUnprocessedMetaLead:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        meta_lead_id:
+          type: string
+          maxLength: 100
+        campaign_name:
+          type: string
+          maxLength: 255
+        ad_id:
+          type: string
+          maxLength: 100
+        form_id:
+          type: string
+          maxLength: 100
+        raw_payload: {}
+        review_notes:
+          type: string
+        is_resolved:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+    PatchedUserUpdate:
+      type: object
+      description: Serializer for user updates, calling UserService.
+      properties:
+        first_name:
+          type: string
+          maxLength: 150
+        last_name:
+          type: string
+          maxLength: 150
+        role:
+          $ref: '#/components/schemas/RoleEnum'
+        phone:
+          type: string
+          maxLength: 32
+        receives_meta_leads:
+          type: boolean
+        is_active:
+          type: boolean
+          title: Active
+          description: Designates whether this user should be treated as active. Unselect
+            this instead of deleting accounts.
+    ProductCategoryEnum:
+      enum:
+      - laptop
+      - desktop_build
+      - gaming_pc
+      - peripherals
+      - components
+      - repair_service
+      - other
+      type: string
+      description: |-
+        * `laptop` - Laptop
+        * `desktop_build` - Desktop / Custom PC Build
+        * `gaming_pc` - Gaming PC
+        * `peripherals` - Monitor & Peripherals
+        * `components` - Components & Upgrades
+        * `repair_service` - Repair & Service
+        * `other` - Other
+    ReminderTypeEnum:
+      enum:
+      - call
+      - whatsapp
+      - quote_review
+      - general
+      type: string
+      description: |-
+        * `call` - Phone Call
+        * `whatsapp` - WhatsApp Message
+        * `quote_review` - Quote Review
+        * `general` - General Follow-up
+    RoleEnum:
+      enum:
+      - admin
+      - manager
+      - staff
+      type: string
+      description: |-
+        * `admin` - Admin
+        * `manager` - Manager
+        * `staff` - Staff
+    SourceEnum:
+      enum:
+      - walk_in
+      - phone
+      - whatsapp
+      - meta_lead_ads
+      - referral
+      - website
+      - other
+      type: string
+      description: |-
+        * `walk_in` - Walk-in
+        * `phone` - Phone Call
+        * `whatsapp` - WhatsApp
+        * `meta_lead_ads` - Meta Lead Ads
+        * `referral` - Referral
+        * `website` - Website
+        * `other` - Other
+    Stage:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 50
+        slug:
+          type: string
+          maxLength: 50
+          pattern: ^[-a-zA-Z0-9_]+$
+        order:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        is_won:
+          type: boolean
+        is_lost:
+          type: boolean
+        color:
+          type: string
+          maxLength: 20
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - name
+      - order
+      - slug
+      - updated_at
+    TokenRefresh:
+      type: object
+      properties:
+        access:
+          type: string
+          readOnly: true
+        refresh:
+          type: string
+      required:
+      - access
+      - refresh
+    UnprocessedMetaLead:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        meta_lead_id:
+          type: string
+          maxLength: 100
+        campaign_name:
+          type: string
+          maxLength: 255
+        ad_id:
+          type: string
+          maxLength: 100
+        form_id:
+          type: string
+          maxLength: 100
+        raw_payload: {}
+        review_notes:
+          type: string
+        is_resolved:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - meta_lead_id
+    User:
+      type: object
+      description: Serializer for representation of User details.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        username:
+          type: string
+          description: Required. 150 characters or fewer. Letters, digits and @/./+/-/_
+            only.
+          pattern: ^[\w.@+-]+$
+          maxLength: 150
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        first_name:
+          type: string
+          maxLength: 150
+        last_name:
+          type: string
+          maxLength: 150
+        role:
+          $ref: '#/components/schemas/RoleEnum'
+        phone:
+          type: string
+          maxLength: 32
+        receives_meta_leads:
+          type: boolean
+        last_meta_lead_assigned_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        is_active:
+          type: boolean
+          title: Active
+          description: Designates whether this user should be treated as active. Unselect
+            this instead of deleting accounts.
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - email
+      - id
+      - last_meta_lead_assigned_at
+      - updated_at
+      - username
+    UserCreate:
+      type: object
+      description: Serializer for user creation, calling UserService.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        username:
+          type: string
+          description: Required. 150 characters or fewer. Letters, digits and @/./+/-/_
+            only.
+          pattern: ^[\w.@+-]+$
+          maxLength: 150
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        password:
+          type: string
+          writeOnly: true
+          minLength: 8
+        first_name:
+          type: string
+          maxLength: 150
+        last_name:
+          type: string
+          maxLength: 150
+        role:
+          $ref: '#/components/schemas/RoleEnum'
+        phone:
+          type: string
+          maxLength: 32
+        receives_meta_leads:
+          type: boolean
+      required:
+      - email
+      - id
+      - password
+      - username
+    UserUpdate:
+      type: object
+      description: Serializer for user updates, calling UserService.
+      properties:
+        first_name:
+          type: string
+          maxLength: 150
+        last_name:
+          type: string
+          maxLength: 150
+        role:
+          $ref: '#/components/schemas/RoleEnum'
+        phone:
+          type: string
+          maxLength: 32
+        receives_meta_leads:
+          type: boolean
+        is_active:
+          type: boolean
+          title: Active
+          description: Designates whether this user should be treated as active. Unselect
+            this instead of deleting accounts.
+  securitySchemes:
+    jwtAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

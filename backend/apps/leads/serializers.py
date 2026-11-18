@@ -20,6 +20,10 @@ from apps.leads.services import (
 )
 
 
+class CheckPhoneRequestSerializer(serializers.Serializer):
+    phone = serializers.CharField(help_text="Customer phone number (E.164 or digits)")
+
+
 class StageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Stage
@@ -244,6 +248,13 @@ class LeadCreateSerializer(serializers.Serializer):
     )
     notes = serializers.CharField(required=False, allow_blank=True, default="")
     assigned_to_id = serializers.IntegerField(required=False, allow_null=True)
+
+    def validate_source(self, value):
+        if value == LeadSource.META_LEAD_ADS:
+            raise serializers.ValidationError(
+                "Manual creation of Meta Lead Ads leads is not allowed."
+            )
+        return value
 
     def create(self, validated_data):
         user = self.context["request"].user

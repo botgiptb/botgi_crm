@@ -36,6 +36,8 @@ INSTALLED_APPS = [
     "corsheaders",
     "rest_framework",
     "rest_framework_simplejwt",
+    "rest_framework_simplejwt.token_blacklist",
+    "drf_spectacular",
     # Local apps
     "apps.accounts",
     "apps.leads",
@@ -145,8 +147,9 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 # Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# Reverse Proxy (Nginx)
+# Reverse Proxy (Nginx) & SSL
 NUM_PROXIES = int(os.getenv("NUM_PROXIES", "0"))
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 # Django REST Framework
 REST_FRAMEWORK = {
@@ -154,21 +157,43 @@ REST_FRAMEWORK = {
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
-    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "DEFAULT_PAGINATION_CLASS": "config.pagination.StandardResultsSetPagination",
     "PAGE_SIZE": 20,
     "DATETIME_FORMAT": "%Y-%m-%dT%H:%M:%SZ",
     "NUM_PROXIES": NUM_PROXIES,
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
 
 # SimpleJWT Settings
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
     "ROTATE_REFRESH_TOKENS": True,
-    "BLACKLIST_AFTER_ROTATION": False,
+    "BLACKLIST_AFTER_ROTATION": True,
+    "UPDATE_LAST_LOGIN": True,
     "ALGORITHM": "HS256",
     "SIGNING_KEY": SECRET_KEY,
     "AUTH_HEADER_TYPES": ("Bearer",),
+}
+
+# Auth Cookie & Allowed Origins for Same-Origin / Nginx Deployment
+JWT_COOKIE_SECURE = os.getenv("JWT_COOKIE_SECURE", "false").lower() in ("true", "1")
+ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv(
+        "ALLOWED_ORIGINS",
+        "http://localhost,http://127.0.0.1,http://localhost:80,http://localhost:4200,http://localhost:8000",
+    ).split(",")
+    if origin.strip()
+]
+
+# OpenAPI Schema (drf-spectacular)
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Shop CRM API",
+    "DESCRIPTION": "Sales Lead Management System for Computer Shop",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "SERVE_PERMISSIONS": ["apps.accounts.permissions.IsAdminRole"],
 }
 
 # CORS Configuration
