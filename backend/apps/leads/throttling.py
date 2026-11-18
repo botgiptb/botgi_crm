@@ -31,7 +31,7 @@ class CheckPhoneIPThrottle(SimpleRateThrottle):
     """Throttle phone checks per IP (max 30 requests per minute)."""
 
     scope = "check_phone_ip"
-    rate = "30/min"
+    rate = "120/min"
 
     def get_cache_key(self, request, view):
         client_ip = get_client_ip(request) or self.get_ident(request)

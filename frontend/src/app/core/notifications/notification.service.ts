@@ -35,7 +35,6 @@ export class NotificationService implements OnDestroy {
       this.visibilityListener = () => {
         if (document.visibilityState === 'visible') {
           if (this.authService.isAuthenticated()) {
-            this.fetchUnreadCount();
             this.startPolling();
           }
         } else {

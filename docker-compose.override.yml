@@ -1,0 +1,11 @@
+# Development environment overrides for docker-compose.
+# Automatically loaded by `docker compose up` for local plain-HTTP testing.
+# In production with TLS, ignore this file or deploy with:
+#   docker compose -f docker-compose.yml up -d
+
+services:
+  backend:
+    environment:
+      DEBUG: "True"
+      JWT_COOKIE_SECURE: "False"
+      ALLOWED_ORIGINS: "http://127.0.0.1:8080,http://localhost:8080"

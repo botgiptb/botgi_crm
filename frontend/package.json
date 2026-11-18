@@ -6,11 +6,14 @@
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test",
-    "typegen": "openapi-typescript ../schema.yml -o src/app/core/api/schema.d.ts"
+    "test": "ng test --watch=false --browsers=ChromeHeadlessNoSandbox",
+    "lint": "eslint src --ext .ts",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "generate:api": "openapi-typescript ../schema.yml -o src/app/core/api/schema.d.ts",
+    "check:api": "node scripts/check-schema-ts.js"
   },
   "engines": {
-    "node": ">=20.0.0",
+    "node": ">=22.0.0",
     "npm": ">=10.0.0"
   },
   "private": true,
@@ -34,6 +37,10 @@
     "@angular/cli": "^19.2.27",
     "@angular/compiler-cli": "^19.2.0",
     "@types/jasmine": "~5.1.0",
+    "@typescript-eslint/eslint-plugin": "7.18.0",
+    "@typescript-eslint/parser": "7.18.0",
+    "eslint": "8.57.1",
+    "eslint-config-prettier": "9.1.2",
     "jasmine-core": "~5.6.0",
     "karma": "~6.4.0",
     "karma-chrome-launcher": "~3.2.0",
@@ -41,6 +48,7 @@
     "karma-jasmine": "~5.1.0",
     "karma-jasmine-html-reporter": "~2.1.0",
     "openapi-typescript": "^7.6.1",
+    "prettier": "3.10.1",
     "typescript": "~5.7.2"
   }
 }

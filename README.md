@@ -14,8 +14,10 @@ Internet --> [Host Nginx (TLS / Let's Encrypt)]
                |  (Sets X-Forwarded-Proto: https)
                v
              [Compose Nginx (127.0.0.1:8080)]
-               |-- /api/* --> [Django Backend (Gunicorn)]
-               +-- /*     --> [Angular SPA static files]
+               |-- /api/*    --> [Django Backend (Gunicorn + WhiteNoise)]
+               |-- /admin/*  --> [Django Backend (Gunicorn + WhiteNoise, IP Restricted)]
+               |-- /static/* --> [Compose Nginx / WhiteNoise]
+               +-- /*        --> [Angular SPA static files]
 ```
 
 ### Trusted Proxy Configuration
@@ -23,6 +25,8 @@ Internet --> [Host Nginx (TLS / Let's Encrypt)]
 2. **Compose Nginx**: Serves the Angular frontend and reverse-proxies `/api/` to `backend:8000`, passing `$http_x_forwarded_for` through unchanged.
 3. **Compose Port Binding**: The Docker Compose Nginx service publishes **strictly** to `127.0.0.1:8080:80` (never `0.0.0.0` or ports 80/443).
 4. **Backend Setting**: `NUM_PROXIES=1` ensures DRF and security throttles trust exactly 1 proxy hop (`ips[-1]`).
+5. **Admin Endpoint Security**: `/admin/` is restricted at the host Nginx level to localhost SSH tunnels and trusted office IPs only (see `docs/nginx-host.conf`).
+6. **Static Files Serving**: Handled by WhiteNoise in Django/Gunicorn and cached at the Nginx layer with long-lived Cache-Control headers.
 
 ---
 
@@ -31,25 +35,25 @@ Internet --> [Host Nginx (TLS / Let's Encrypt)]
 ### Prerequisites
 - Docker & Docker Compose
 - Python 3.12+ (for local backend development)
-- Node 20+ (for local frontend development, or run via Docker)
+- Node 22+ LTS (for local frontend development, or run via Docker)
 
-### Environment Variables
-Copy `.env.example` to `.env` and configure your credentials:
+### Environment Overrides (`docker-compose.override.yml`)
+In local development, `docker compose up` automatically loads `docker-compose.override.yml`, which sets `DEBUG=True`, `JWT_COOKIE_SECURE=False`, and `ALLOWED_ORIGINS=http://127.0.0.1:8080,http://localhost:8080`.
+In production with TLS, deploy strictly using the base file:
 ```bash
-cp .env.example .env
+docker compose -f docker-compose.yml up -d
 ```
 
-Key configuration defaults:
-- `DEBUG=False` (safe production default)
-- `JWT_COOKIE_SECURE=True` (safe production default; set to `False` only for plain HTTP local dev without SSL)
-- `NUM_PROXIES=1`
-- `ALLOWED_ORIGINS=http://localhost:8080,https://crm.example.com`
+### Running Frontend via Docker
+Always execute Node commands using the host's UID and GID to ensure generated files have correct file permissions:
+```bash
+docker run --rm -it --user $(id -u):$(id -g) -v $(pwd)/frontend:/workspace -w /workspace -p 4200:4200 node:22-alpine npm start -- --host 0.0.0.0
+```
 
 ### Creating an Administrator
 Superusers must be created interactively through Django's administrative CLI:
 ```bash
-# Inside docker container or local environment:
-python backend/manage.py createsuperuser
+docker compose exec backend python manage.py createsuperuser
 ```
 
 ### Demo Data (DEBUG only)
@@ -58,6 +62,15 @@ To seed demo stages, users, customers, and leads in a development environment:
 DEBUG=True python backend/manage.py seed_demo
 ```
 *(Note: `seed_demo` automatically aborts with an error if `DEBUG=False`.)*
+
+---
+
+## Shared Redis Rate Limiting Verification
+
+Login throttling is keyed on `(username, IP)` (5/min), IP (20/min), and username backstop (30/hour), backed by centralized Redis cache (`django.core.cache.backends.redis.RedisCache`):
+
+> **Manual Check (Multiple Gunicorn Workers)**:
+> When running the backend with 2 or more Gunicorn workers (e.g., `gunicorn config.wsgi:application --workers 4`), 5 failed login attempts from a given IP across different worker processes immediately trigger `429 Too Many Requests` on the 6th attempt. This verifies that login failure counters are shared atomically across Gunicorn worker processes in Redis, preventing per-process worker throttling bypass.
 
 ---
 
@@ -80,10 +93,14 @@ Add to host crontab (`crontab -e`):
 
 ---
 
-## Verifying OpenAPI Schema
+## OpenAPI Schema Synchronization
 
-To ensure the committed OpenAPI schema (`schema.yml`) remains synchronized with the backend code:
+To ensure the committed OpenAPI schema (`schema.yml`) and TypeScript definitions (`schema.d.ts`) remain synchronized with the backend code:
 
 ```bash
+# Check OpenAPI YAML schema
 ./scripts/check_schema.sh
+
+# Regenerate and check TypeScript definitions
+cd frontend && npm run generate:api && npm run check:api
 ```

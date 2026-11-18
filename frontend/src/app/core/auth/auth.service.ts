@@ -1,7 +1,7 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { Observable, catchError, firstValueFrom, map, of, tap, throwError } from 'rxjs';
+import { Observable, catchError, firstValueFrom, map, of, tap } from 'rxjs';
 import { AuthResponse, LoginRequest, User } from '../models/user.model';
 
 export const AUTH_CHANNEL_NAME = 'shopcrm_auth_channel';

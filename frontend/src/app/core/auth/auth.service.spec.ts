@@ -17,8 +17,10 @@ describe('AuthService', () => {
     role: 'staff',
     first_name: 'Test',
     last_name: 'Staff',
-    is_staff: false,
     receives_meta_leads: true,
+    last_meta_lead_assigned_at: null,
+    created_at: '2026-01-01T00:00:00Z',
+    updated_at: '2026-01-01T00:00:00Z',
   };
 
   const mockAuthResponse: AuthResponse = {

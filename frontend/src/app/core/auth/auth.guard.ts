@@ -16,7 +16,7 @@ export const authGuard: CanActivateFn = (route, state) => {
   });
 };
 
-export const managerGuard: CanActivateFn = (route, state) => {
+export const managerGuard: CanActivateFn = (_route, _state) => {
   const authService = inject(AuthService);
   const router = inject(Router);
 
