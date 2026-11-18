@@ -1,6 +1,6 @@
 from rest_framework.throttling import SimpleRateThrottle
 
-from apps.integrations_meta.services import MetaSecurityService
+from apps.common.utils import get_client_ip
 
 
 class CheckPhoneUserMinuteThrottle(SimpleRateThrottle):
@@ -34,5 +34,5 @@ class CheckPhoneIPThrottle(SimpleRateThrottle):
     rate = "30/min"
 
     def get_cache_key(self, request, view):
-        client_ip = MetaSecurityService.get_client_ip(request) or self.get_ident(request)
+        client_ip = get_client_ip(request) or self.get_ident(request)
         return f"throttle_check_phone_ip:{client_ip}"

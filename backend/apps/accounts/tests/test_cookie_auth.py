@@ -171,13 +171,17 @@ class TestCookieAuthentication:
             assert BlacklistedToken.objects.filter(token__token=refresh_token).exists()
 
     def test_login_throttling_per_ip_and_username(self, auth_user):
-        """Failed logins are throttled per IP and per username (5 failed attempts per min)."""
+        """
+        Failed logins are throttled per (username, IP) combo (5/min).
+        5 failed attempts from IP1 on UserA does NOT lock out UserA from IP2.
+        Successful login resets ONLY combo_key, while pure IP counter keeps accumulating.
+        """
         client = APIClient()
         cache.clear()
 
         with override_settings(ALLOWED_ORIGINS=TEST_ALLOWED_ORIGINS):
-            # 5 consecutive failed attempts from IP 192.168.1.50
-            for i in range(5):
+            # 1. 5 consecutive failed attempts from IP1 (192.168.1.50) on authtestuser
+            for _ in range(5):
                 resp = client.post(
                     "/api/auth/login/",
                     {"username": "authtestuser", "password": "WrongPassword!"},
@@ -187,7 +191,7 @@ class TestCookieAuthentication:
                 )
                 assert resp.status_code == status.HTTP_401_UNAUTHORIZED
 
-            # 6th attempt from same IP is throttled
+            # 6th attempt from IP1 on authtestuser is throttled (combo reached 5)
             throttled_resp = client.post(
                 "/api/auth/login/",
                 {"username": "authtestuser", "password": "WrongPassword!"},
@@ -197,18 +201,22 @@ class TestCookieAuthentication:
             )
             assert throttled_resp.status_code == status.HTTP_429_TOO_MANY_REQUESTS
 
-            # Another IP targeting the same username is ALSO throttled (per-username protection)
-            attacker_resp = client.post(
+            # 2. Legitimate user logging in from IP2 (10.0.0.99) is NOT locked out
+            legit_resp = client.post(
                 "/api/auth/login/",
-                {"username": "authtestuser", "password": "WrongPassword!"},
+                {"username": "authtestuser", "password": "ValidPassword123!"},
                 format="json",
                 HTTP_ORIGIN=TEST_ORIGIN,
                 REMOTE_ADDR="10.0.0.99",
             )
-            assert attacker_resp.status_code == status.HTTP_429_TOO_MANY_REQUESTS
+            assert legit_resp.status_code == status.HTTP_200_OK
 
-            # Reset cache, successful login clears failure counts
-            cache.clear()
+            # 3. Successful login resets ONLY combo_key, NEVER pure-IP counter
+            # IP1 has 5 failed attempts in pure-IP counter (limit is 20)
+            assert cache.get("failed_login_ip:192.168.1.50") == 5
+            # Now let authtestuser log in successfully from IP1
+            # First reset combo counter manually so it's not blocked by combo
+            cache.delete("failed_login_combo:192.168.1.50:authtestuser")
             success_resp = client.post(
                 "/api/auth/login/",
                 {"username": "authtestuser", "password": "ValidPassword123!"},
@@ -217,6 +225,53 @@ class TestCookieAuthentication:
                 REMOTE_ADDR="192.168.1.50",
             )
             assert success_resp.status_code == status.HTTP_200_OK
+            # Combo key is deleted
+            assert cache.get("failed_login_combo:192.168.1.50:authtestuser") is None
+            # Pure IP counter is still intact (never reset on successful login)
+            assert cache.get("failed_login_ip:192.168.1.50") == 5
+
+    def test_login_throttling_trusted_ip_and_spoofed_header(self, auth_user):
+        """Spoofed X-Forwarded-For cannot manipulate the client IP or throttle bucket."""
+        client = APIClient()
+        cache.clear()
+
+        # Case A: NUM_PROXIES = 1 (production behind 1 proxy)
+        # Client sends spoofed header: "1.1.1.1, 2.2.2.2"
+        # The trusted client IP is 2.2.2.2 (ips[-1]), ignoring 1.1.1.1
+        with override_settings(ALLOWED_ORIGINS=TEST_ALLOWED_ORIGINS, NUM_PROXIES=1):
+            for _ in range(5):
+                resp = client.post(
+                    "/api/auth/login/",
+                    {"username": "authtestuser", "password": "WrongPassword!"},
+                    format="json",
+                    HTTP_ORIGIN=TEST_ORIGIN,
+                    REMOTE_ADDR="127.0.0.1",
+                    HTTP_X_FORWARDED_FOR="1.1.1.1, 2.2.2.2",
+                )
+                assert resp.status_code == status.HTTP_401_UNAUTHORIZED
+
+            # The combo counter should be under the trusted proxy IP 2.2.2.2, NOT 1.1.1.1
+            assert cache.get("failed_login_combo:2.2.2.2:authtestuser") == 5
+            assert cache.get("failed_login_combo:1.1.1.1:authtestuser") is None
+
+        # Case B: NUM_PROXIES = 0 (direct connection / dev)
+        # Client sends spoofed header: "1.1.1.1"
+        # With NUM_PROXIES = 0, REMOTE_ADDR is used unconditionally
+        cache.clear()
+        with override_settings(ALLOWED_ORIGINS=TEST_ALLOWED_ORIGINS, NUM_PROXIES=0):
+            for _ in range(5):
+                resp = client.post(
+                    "/api/auth/login/",
+                    {"username": "authtestuser", "password": "WrongPassword!"},
+                    format="json",
+                    HTTP_ORIGIN=TEST_ORIGIN,
+                    REMOTE_ADDR="192.168.1.77",
+                    HTTP_X_FORWARDED_FOR="1.1.1.1",
+                )
+                assert resp.status_code == status.HTTP_401_UNAUTHORIZED
+
+            assert cache.get("failed_login_combo:192.168.1.77:authtestuser") == 5
+            assert cache.get("failed_login_combo:1.1.1.1:authtestuser") is None
 
     def test_logout_blacklists_cookie_token_and_clears_cookie_idempotently(self, auth_user):
         """Logout blacklists refresh token, clears cookie, and succeeds even without access token."""
@@ -254,3 +309,16 @@ class TestCookieAuthentication:
                 HTTP_ORIGIN=TEST_ORIGIN,
             )
             assert second_logout.status_code == status.HTTP_200_OK
+
+    def test_cache_configuration(self):
+        """Verify production settings specify RedisCache and test settings use LocMemCache."""
+        from django.conf import settings
+        from config import settings as prod_settings
+
+        # In current test runtime, settings_test is active
+        assert settings.CACHES["default"]["BACKEND"] == "django.core.cache.backends.locmem.LocMemCache"
+
+        # In production settings module, RedisCache is defined
+        assert prod_settings.CACHES["default"]["BACKEND"] == "django.core.cache.backends.redis.RedisCache"
+        assert "redis://" in prod_settings.CACHES["default"]["LOCATION"]
+

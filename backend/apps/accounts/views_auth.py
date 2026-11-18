@@ -14,7 +14,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.accounts.models import User
 from apps.accounts.serializers import UserSerializer
-from apps.integrations_meta.services import MetaSecurityService
+from apps.common.utils import get_client_ip
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ class LogoutResponseSerializer(serializers.Serializer):
 def verify_origin(request) -> bool:
     """
     Verify that request Origin (fallback Referer, reject if both missing)
-    matches the configured ALLOWED_ORIGINS allowlist.
+    matches the configured ALLOWED_ORIGINS allowlist exactly (scheme + host + optional port).
     Prevents CSRF on cookie-based authentication endpoints.
     """
     origin = request.headers.get("Origin")
@@ -53,13 +53,14 @@ def verify_origin(request) -> bool:
     if not origin:
         return False
 
-    allowed = getattr(settings, "ALLOWED_ORIGINS", [])
+    origin = origin.rstrip("/")
+    allowed = {o.rstrip("/") for o in getattr(settings, "ALLOWED_ORIGINS", []) if o.strip()}
     return origin in allowed
 
 
 def set_refresh_cookie(response: Response, refresh_token: str) -> None:
     """Attach rotated refresh token in a secure, httpOnly cookie restricted to auth endpoints."""
-    secure = getattr(settings, "JWT_COOKIE_SECURE", False)
+    secure = getattr(settings, "JWT_COOKIE_SECURE", True)
     lifetime = settings.SIMPLE_JWT.get("REFRESH_TOKEN_LIFETIME")
     max_age = int(lifetime.total_seconds()) if lifetime else 7 * 86400
 
@@ -83,33 +84,57 @@ def clear_refresh_cookie(response: Response) -> None:
 
 
 def is_login_throttled(client_ip: str, username: str) -> bool:
-    """Check if IP or username has exceeded failed login threshold (5 failed attempts per min)."""
+    """
+    Check if failed login threshold has been reached:
+    - (username, IP) combination: 5 failed attempts per min
+    - Pure IP: 20 failed attempts per min (prevents credential spraying)
+    - Username backstop: 30 failed attempts per hour (prevents distributed brute-force)
+    """
+    clean_user = username.lower().strip()
+    combo_key = f"failed_login_combo:{client_ip}:{clean_user}"
+    user_key = f"failed_login_user:{clean_user}"
     ip_key = f"failed_login_ip:{client_ip}"
-    user_key = f"failed_login_user:{username.lower().strip()}"
-    return cache.get(ip_key, 0) >= 5 or cache.get(user_key, 0) >= 5
+
+    combo_fails = cache.get(combo_key) or 0
+    user_fails = cache.get(user_key) or 0
+    ip_fails = cache.get(ip_key) or 0
+
+    return combo_fails >= 5 or user_fails >= 30 or ip_fails >= 20
 
 
 def record_failed_login(client_ip: str, username: str) -> None:
-    """Increment failed login attempt counts for client IP and username."""
+    """Increment failed login attempt counts for (ip, user) combo, user backstop, and IP."""
+    clean_user = username.lower().strip()
+    combo_key = f"failed_login_combo:{client_ip}:{clean_user}"
+    user_key = f"failed_login_user:{clean_user}"
     ip_key = f"failed_login_ip:{client_ip}"
-    user_key = f"failed_login_user:{username.lower().strip()}"
-    cache.set(ip_key, cache.get(ip_key, 0) + 1, timeout=60)
-    cache.set(user_key, cache.get(user_key, 0) + 1, timeout=60)
+
+    for key, timeout in [(combo_key, 60), (user_key, 3600), (ip_key, 60)]:
+        val = cache.get(key)
+        if val is None:
+            cache.set(key, 1, timeout=timeout)
+        else:
+            try:
+                cache.incr(key)
+            except ValueError:
+                cache.set(key, val + 1, timeout=timeout)
 
 
 def clear_failed_logins(client_ip: str, username: str) -> None:
-    """Reset failed login counters upon successful authentication."""
-    ip_key = f"failed_login_ip:{client_ip}"
-    user_key = f"failed_login_user:{username.lower().strip()}"
-    cache.delete(ip_key)
-    cache.delete(user_key)
+    """
+    Reset ONLY the (username, IP) combo counter on successful login.
+    Never resets pure-IP counter to prevent attackers resetting IP quota.
+    """
+    clean_user = username.lower().strip()
+    combo_key = f"failed_login_combo:{client_ip}:{clean_user}"
+    cache.delete(combo_key)
 
 
 class CookieLoginView(APIView):
     """
     Authenticate user credentials, return in-memory access token,
     and set the rotated refresh token in an httpOnly cookie.
-    Throttles failed login attempts per IP and per username.
+    Throttles failed login attempts per (username, IP) combo, IP, and username.
     Enforces origin verification against ALLOWED_ORIGINS.
     """
 
@@ -130,7 +155,7 @@ class CookieLoginView(APIView):
 
         username = request.data.get("username", "").strip()
         password = request.data.get("password", "")
-        client_ip = MetaSecurityService.get_client_ip(request)
+        client_ip = get_client_ip(request)
 
         if not username or not password:
             return Response(

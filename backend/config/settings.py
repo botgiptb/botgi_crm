@@ -17,7 +17,7 @@ sys.path.insert(0, str(BASE_DIR / "apps"))
 
 # Security
 SECRET_KEY = os.getenv("SECRET_KEY", "django-insecure-shopcrm-change-me-in-production-env-variable")
-DEBUG = os.getenv("DEBUG", "True").lower() in ("true", "1")
+DEBUG = os.getenv("DEBUG", "False").lower() in ("true", "1")
 ALLOWED_HOSTS = [
     h.strip()
     for h in os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1,0.0.0.0").split(",")
@@ -177,7 +177,7 @@ SIMPLE_JWT = {
 }
 
 # Auth Cookie & Allowed Origins for Same-Origin / Nginx Deployment
-JWT_COOKIE_SECURE = os.getenv("JWT_COOKIE_SECURE", "false").lower() in ("true", "1")
+JWT_COOKIE_SECURE = os.getenv("JWT_COOKIE_SECURE", "true").lower() in ("true", "1")
 ALLOWED_ORIGINS = [
     origin.strip()
     for origin in os.getenv(
@@ -186,6 +186,14 @@ ALLOWED_ORIGINS = [
     ).split(",")
     if origin.strip()
 ]
+
+# Cache Configuration (Redis backend in production)
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": os.getenv("REDIS_URL", "redis://localhost:6379/1"),
+    }
+}
 
 # OpenAPI Schema (drf-spectacular)
 SPECTACULAR_SETTINGS = {

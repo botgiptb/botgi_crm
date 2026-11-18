@@ -176,7 +176,7 @@ paths:
       description: |-
         Authenticate user credentials, return in-memory access token,
         and set the rotated refresh token in an httpOnly cookie.
-        Throttles failed login attempts per IP and per username.
+        Throttles failed login attempts per (username, IP) combo, IP, and username.
         Enforces origin verification against ALLOWED_ORIGINS.
       summary: Login and obtain in-memory access token with httpOnly refresh cookie
       tags:
@@ -3072,9 +3072,8 @@ components:
           pattern: ^[-a-zA-Z0-9_]+$
         order:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
         is_won:
           type: boolean
         is_lost:
