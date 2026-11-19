@@ -215,15 +215,14 @@ class TestPhase5aBackendGaps:
 
     def test_check_phone_ip_throttling_at_120_per_min(self, p5a_setup):
         """Check-phone endpoint throttles per-IP at 120/min when multiple users share an IP."""
-        client = APIClient()
         cache.clear()
 
         # Simulate requests across multiple authenticated staff from the same shop IP (192.168.1.100)
         # Directly check rate config
         from apps.leads.throttling import CheckPhoneIPThrottle
+
         throttle = CheckPhoneIPThrottle()
         assert throttle.rate == "120/min"
-
 
     def test_staff_forced_to_assigned_leads_even_with_query_param(self, p5a_setup):
         """Staff querying /api/leads/?assigned_to=<other> is strictly forced to their own leads."""

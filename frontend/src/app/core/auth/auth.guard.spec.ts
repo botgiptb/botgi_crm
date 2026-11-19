@@ -17,9 +17,7 @@ describe('Auth Guards', () => {
     ]);
 
     TestBed.configureTestingModule({
-      providers: [
-        { provide: AuthService, useValue: authServiceSpy },
-      ],
+      providers: [{ provide: AuthService, useValue: authServiceSpy }],
     });
 
     router = TestBed.inject(Router);

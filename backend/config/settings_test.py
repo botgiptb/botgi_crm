@@ -17,4 +17,3 @@ CACHES = {
         "LOCATION": "unique-test-cache",
     }
 }
-

@@ -73,16 +73,14 @@ export class AuthService {
    * Silent refresh of the access token using httpOnly cookie.
    */
   refresh(): Observable<string> {
-    return this.http
-      .post<AuthResponse>('/api/auth/refresh/', {}, { withCredentials: true })
-      .pipe(
-        tap((res) => {
-          this.accessToken = res.access;
-          this.currentUser.set(res.user);
-          this.isOffline.set(false);
-        }),
-        map((res) => res.access),
-      );
+    return this.http.post<AuthResponse>('/api/auth/refresh/', {}, { withCredentials: true }).pipe(
+      tap((res) => {
+        this.accessToken = res.access;
+        this.currentUser.set(res.user);
+        this.isOffline.set(false);
+      }),
+      map((res) => res.access),
+    );
   }
 
   /**

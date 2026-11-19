@@ -118,7 +118,10 @@ describe('AuthService', () => {
     const initPromise = service.initAuth();
 
     const req = httpMock.expectOne('/api/auth/refresh/');
-    req.flush({ detail: 'Refresh token cookie missing.' }, { status: 401, statusText: 'Unauthorized' });
+    req.flush(
+      { detail: 'Refresh token cookie missing.' },
+      { status: 401, statusText: 'Unauthorized' },
+    );
 
     await initPromise;
     expect(service.isOffline()).toBeFalse();

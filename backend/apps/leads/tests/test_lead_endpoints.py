@@ -203,3 +203,20 @@ class TestLeadEndpointsAndPermissions:
         assert res_patch_mgr.status_code == status.HTTP_200_OK
         item.refresh_from_db()
         assert item.is_resolved is True
+
+    def test_lead_list_query_count_assert_num_queries(self, django_assert_num_queries):
+        """Verify constant query count (no N+1) at page size 20."""
+        for i in range(25):
+            LeadService.create_lead(
+                customer_data={"phone": f"9876543{i:03d}", "name": f"Customer {i}"},
+                lead_data={"title": f"Lead {i}"},
+                user=self.staff1,
+            )
+        self.client.force_authenticate(user=self.staff1)
+        # Expected queries:
+        # 1. SELECT COUNT(*) for pagination
+        # 2. SELECT leads JOIN customer JOIN stage LEFT JOIN assigned_to (page slice of 20)
+        with django_assert_num_queries(2):
+            response = self.client.get("/api/leads/?page_size=20")
+            assert response.status_code == status.HTTP_200_OK
+            assert len(response.data["results"]) == 20

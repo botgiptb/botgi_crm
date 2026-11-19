@@ -1,7 +1,12 @@
-import { HttpClient, HttpErrorResponse, provideHttpClient, withInterceptors } from '@angular/common/http';
+import {
+  HttpClient,
+  HttpErrorResponse,
+  provideHttpClient,
+  withInterceptors,
+} from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { of, throwError } from 'rxjs';
+import { of, throwError, Subject } from 'rxjs';
 import { authInterceptor, resetAuthInterceptorState } from './auth.interceptor';
 import { AuthService } from './auth.service';
 
@@ -9,6 +14,7 @@ describe('authInterceptor', () => {
   let http: HttpClient;
   let httpMock: HttpTestingController;
   let authServiceSpy: jasmine.SpyObj<AuthService>;
+  const originalLocks = (navigator as unknown as { locks?: unknown }).locks;
 
   beforeEach(() => {
     resetAuthInterceptorState();
@@ -36,6 +42,11 @@ describe('authInterceptor', () => {
   });
 
   afterEach(() => {
+    Object.defineProperty(navigator, 'locks', {
+      value: originalLocks,
+      configurable: true,
+      writable: true,
+    });
     httpMock.verify();
     resetAuthInterceptorState();
   });
@@ -112,7 +123,7 @@ describe('authInterceptor', () => {
 
       retry1.flush({ id: 1 });
       retry2.flush({ id: 2 });
-    }, 50);
+    }, 200);
   });
 
   it('should replay only once and propagate error if replayed request still returns 401', (done) => {
@@ -143,7 +154,7 @@ describe('authInterceptor', () => {
 
       // No second retry should be issued
       httpMock.expectNone('/api/leads/');
-    }, 50);
+    }, 200);
   });
 
   it('network error on refresh keeps the session and sets isOffline', (done) => {
@@ -181,5 +192,59 @@ describe('authInterceptor', () => {
 
     const req = httpMock.expectOne('/api/leads/');
     req.flush({ detail: 'Token expired' }, { status: 401, statusText: 'Unauthorized' });
+  });
+
+  it('parallel 401s should fall back to in-tab single-flight when navigator.locks is undefined', (done) => {
+    Object.defineProperty(navigator, 'locks', {
+      value: undefined,
+      configurable: true,
+      writable: true,
+    });
+
+    const refreshSubject = new Subject<string>();
+    let currentToken: string | null = null;
+    authServiceSpy.getAccessToken.and.callFake(() => currentToken);
+    authServiceSpy.refresh.and.callFake(() => refreshSubject.asObservable());
+
+    let completed = 0;
+    const checkDone = () => {
+      completed++;
+      if (completed === 2) {
+        expect(authServiceSpy.refresh).toHaveBeenCalledTimes(1);
+        done();
+      }
+    };
+
+    http.get('/api/leads/1/').subscribe((res) => {
+      expect(res).toEqual({ id: 1 });
+      checkDone();
+    });
+
+    http.get('/api/leads/2/').subscribe((res) => {
+      expect(res).toEqual({ id: 2 });
+      checkDone();
+    });
+
+    const req1 = httpMock.expectOne('/api/leads/1/');
+    const req2 = httpMock.expectOne('/api/leads/2/');
+
+    req1.flush({ detail: 'Token expired' }, { status: 401, statusText: 'Unauthorized' });
+    req2.flush({ detail: 'Token expired' }, { status: 401, statusText: 'Unauthorized' });
+
+    // Emit token from refreshSubject
+    currentToken = 'fallback-token';
+    refreshSubject.next('fallback-token');
+    refreshSubject.complete();
+
+    setTimeout(() => {
+      const retry1 = httpMock.expectOne('/api/leads/1/');
+      const retry2 = httpMock.expectOne('/api/leads/2/');
+
+      expect(retry1.request.headers.get('Authorization')).toBe('Bearer fallback-token');
+      expect(retry2.request.headers.get('Authorization')).toBe('Bearer fallback-token');
+
+      retry1.flush({ id: 1 });
+      retry2.flush({ id: 2 });
+    }, 200);
   });
 });

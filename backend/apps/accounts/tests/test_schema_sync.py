@@ -1,7 +1,6 @@
 import io
-import subprocess
 from pathlib import Path
-import pytest
+
 from django.core.management import call_command
 
 
@@ -32,4 +31,3 @@ def test_committed_schema_matches_spectacular():
         "Committed schema.yml is out of sync with backend code. "
         "Run: python backend/manage.py spectacular --file schema.yml"
     )
-

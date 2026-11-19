@@ -37,11 +37,15 @@ Internet --> [Host Nginx (TLS / Let's Encrypt)]
 - Python 3.12+ (for local backend development)
 - Node 22+ LTS (for local frontend development, or run via Docker)
 
-### Environment Overrides (`docker-compose.override.yml`)
-In local development, `docker compose up` automatically loads `docker-compose.override.yml`, which sets `DEBUG=True`, `JWT_COOKIE_SECURE=False`, and `ALLOWED_ORIGINS=http://127.0.0.1:8080,http://localhost:8080`.
-In production with TLS, deploy strictly using the base file:
+### Environment Overrides (`docker-compose.dev.yml`)
+Plain `docker compose up` is production-safe by default (no automatic overrides).
+For local development where you want `DEBUG=True`, `JWT_COOKIE_SECURE=False`, and `ALLOWED_ORIGINS=http://127.0.0.1:8080,http://localhost:8080`, supply `docker-compose.dev.yml`:
 ```bash
-docker compose -f docker-compose.yml up -d
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+```
+In production with TLS behind the host Nginx proxy, deploy strictly using:
+```bash
+docker compose up -d
 ```
 
 ### Running Frontend via Docker

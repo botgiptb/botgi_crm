@@ -3,4 +3,8 @@ dist
 .angular
 .git
 .vscode
-npm-debug.log
+.idea
+npm-debug.log*
+coverage
+.env
+.env.*

@@ -312,13 +312,17 @@ class TestCookieAuthentication:
 
     def test_cache_configuration(self):
         """Verify production settings specify RedisCache and test settings use LocMemCache."""
-        from django.conf import settings
         from config import settings as prod_settings
+        from django.conf import settings
 
         # In current test runtime, settings_test is active
-        assert settings.CACHES["default"]["BACKEND"] == "django.core.cache.backends.locmem.LocMemCache"
+        assert (
+            settings.CACHES["default"]["BACKEND"] == "django.core.cache.backends.locmem.LocMemCache"
+        )
 
         # In production settings module, RedisCache is defined
-        assert prod_settings.CACHES["default"]["BACKEND"] == "django.core.cache.backends.redis.RedisCache"
+        assert (
+            prod_settings.CACHES["default"]["BACKEND"]
+            == "django.core.cache.backends.redis.RedisCache"
+        )
         assert "redis://" in prod_settings.CACHES["default"]["LOCATION"]
-

@@ -1,7 +1,9 @@
 # Development environment overrides for docker-compose.
-# Automatically loaded by `docker compose up` for local plain-HTTP testing.
-# In production with TLS, ignore this file or deploy with:
-#   docker compose -f docker-compose.yml up -d
+# To run local development with DEBUG=True and plain-HTTP cookies:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+# In production, run plain:
+#   docker compose up -d
 
 services:
   backend:

@@ -83,12 +83,7 @@ import { NotificationService } from '../core/notifications/notification.service'
         </button>
 
         <!-- Logout Button -->
-        <button
-          mat-icon-button
-          (click)="logout()"
-          aria-label="Sign out"
-          matTooltip="Sign Out"
-        >
+        <button mat-icon-button (click)="logout()" aria-label="Sign out" matTooltip="Sign Out">
           <mat-icon>logout</mat-icon>
         </button>
       </mat-toolbar>
@@ -154,7 +149,11 @@ import { NotificationService } from '../core/notifications/notification.service'
             </a>
 
             @if (authService.isManagerOrAdmin()) {
-              <a routerLink="/unprocessed-meta-leads" routerLinkActive="mobile-active" class="bottom-nav-item">
+              <a
+                routerLink="/unprocessed-meta-leads"
+                routerLinkActive="mobile-active"
+                class="bottom-nav-item"
+              >
                 <mat-icon>contact_support</mat-icon>
                 <span>Review</span>
               </a>

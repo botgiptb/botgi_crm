@@ -14,7 +14,9 @@ import { MatIconModule } from '@angular/material/icon';
         <mat-card-subtitle>Phase 5a - Ready for Stop 2 (Lead List & Quick Add)</mat-card-subtitle>
       </mat-card-header>
       <mat-card-content style="padding: 2rem; text-align: center;">
-        <mat-icon style="font-size: 64px; height: 64px; width: 64px; color: #3b82f6;">leaderboard</mat-icon>
+        <mat-icon style="font-size: 64px; height: 64px; width: 64px; color: #3b82f6;"
+          >leaderboard</mat-icon
+        >
         <h3 style="margin-top: 1rem;">Authentication & Application Shell Ready</h3>
         <p style="color: #64748b;">
           Session restored with httpOnly cookie rotation, reactive state, and notification polling.

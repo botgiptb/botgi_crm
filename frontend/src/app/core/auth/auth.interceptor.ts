@@ -1,6 +1,21 @@
-import { HttpErrorResponse, HttpEvent, HttpHandlerFn, HttpInterceptorFn, HttpRequest } from '@angular/common/http';
+import {
+  HttpErrorResponse,
+  HttpEvent,
+  HttpHandlerFn,
+  HttpInterceptorFn,
+  HttpRequest,
+} from '@angular/common/http';
 import { inject } from '@angular/core';
-import { Observable, catchError, finalize, firstValueFrom, from, shareReplay, switchMap, throwError } from 'rxjs';
+import {
+  Observable,
+  catchError,
+  finalize,
+  firstValueFrom,
+  from,
+  shareReplay,
+  switchMap,
+  throwError,
+} from 'rxjs';
 import { AuthService } from './auth.service';
 
 let refreshInProgress$: Observable<string> | null = null;
@@ -10,7 +25,12 @@ export function resetAuthInterceptorState(): void {
 }
 
 function performRefresh(authService: AuthService): Observable<string> {
-  if (typeof navigator !== 'undefined' && 'locks' in navigator) {
+  if (
+    typeof navigator !== 'undefined' &&
+    'locks' in navigator &&
+    navigator.locks &&
+    typeof navigator.locks.request === 'function'
+  ) {
     return from(
       navigator.locks.request('auth-refresh-lock', async () => {
         // Check if another tab refreshed the token while waiting for lock

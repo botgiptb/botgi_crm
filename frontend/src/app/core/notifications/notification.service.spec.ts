@@ -82,7 +82,9 @@ describe('NotificationService', () => {
     httpMock.expectNone('/api/notifications/unread_count/');
 
     // Simulate tab becoming visible again
-    (Object.getOwnPropertyDescriptor(document, 'visibilityState')?.get as jasmine.Spy).and.returnValue('visible');
+    (
+      Object.getOwnPropertyDescriptor(document, 'visibilityState')?.get as jasmine.Spy
+    ).and.returnValue('visible');
     document.dispatchEvent(new Event('visibilitychange'));
 
     // Should immediately trigger an update fetch upon becoming visible

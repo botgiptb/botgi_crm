@@ -63,7 +63,10 @@ import { AuthService } from '../../core/auth/auth.service';
                 autocomplete="username"
               />
               <mat-icon matPrefix>person</mat-icon>
-              @if (loginForm.get('username')?.hasError('required') && loginForm.get('username')?.touched) {
+              @if (
+                loginForm.get('username')?.hasError('required') &&
+                loginForm.get('username')?.touched
+              ) {
                 <mat-error>Username is required</mat-error>
               }
             </mat-form-field>
@@ -88,7 +91,10 @@ import { AuthService } from '../../core/auth/auth.service';
               >
                 <mat-icon>{{ hidePassword() ? 'visibility_off' : 'visibility' }}</mat-icon>
               </button>
-              @if (loginForm.get('password')?.hasError('required') && loginForm.get('password')?.touched) {
+              @if (
+                loginForm.get('password')?.hasError('required') &&
+                loginForm.get('password')?.touched
+              ) {
                 <mat-error>Password is required</mat-error>
               }
             </mat-form-field>
@@ -126,7 +132,9 @@ import { AuthService } from '../../core/auth/auth.service';
         width: 100%;
         max-width: 420px;
         border-radius: 12px;
-        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.2);
+        box-shadow:
+          0 10px 25px -5px rgba(0, 0, 0, 0.3),
+          0 8px 10px -6px rgba(0, 0, 0, 0.2);
         overflow: hidden;
       }
 
@@ -233,28 +241,29 @@ export class LoginComponent {
     this.isLoading.set(true);
     this.errorMessage.set(null);
 
-    this.authService
-      .login({ username, password })
-      .subscribe({
-        next: () => {
-          this.isLoading.set(false);
-          const returnUrl = this.route.snapshot.queryParams['returnUrl'] || '/leads';
-          this.router.navigateByUrl(returnUrl);
-        },
-        error: (err) => {
-          this.isLoading.set(false);
-          if (err.status === 429) {
-            this.errorMessage.set(
-              err.error?.detail || 'Too many failed login attempts. Please wait 1 minute before trying again.'
-            );
-          } else if (err.status === 401) {
-            this.errorMessage.set(err.error?.detail || 'Invalid username or password.');
-          } else if (err.status === 0) {
-            this.errorMessage.set('Cannot reach CRM server. Check your connection.');
-          } else {
-            this.errorMessage.set(err.error?.detail || 'An unexpected error occurred. Please try again.');
-          }
-        },
-      });
+    this.authService.login({ username, password }).subscribe({
+      next: () => {
+        this.isLoading.set(false);
+        const returnUrl = this.route.snapshot.queryParams['returnUrl'] || '/leads';
+        this.router.navigateByUrl(returnUrl);
+      },
+      error: (err) => {
+        this.isLoading.set(false);
+        if (err.status === 429) {
+          this.errorMessage.set(
+            err.error?.detail ||
+              'Too many failed login attempts. Please wait 1 minute before trying again.',
+          );
+        } else if (err.status === 401) {
+          this.errorMessage.set(err.error?.detail || 'Invalid username or password.');
+        } else if (err.status === 0) {
+          this.errorMessage.set('Cannot reach CRM server. Check your connection.');
+        } else {
+          this.errorMessage.set(
+            err.error?.detail || 'An unexpected error occurred. Please try again.',
+          );
+        }
+      },
+    });
   }
 }
