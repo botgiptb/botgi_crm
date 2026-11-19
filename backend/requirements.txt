@@ -7,7 +7,7 @@ python-dotenv>=1.0.0
 phonenumbers==9.0.42
 celery==5.4.0
 kombu==5.4.2
-redis==5.2.1
+redis==8.1.0
 packaging==24.2
 requests==2.32.3
 drf-spectacular==0.30.0
